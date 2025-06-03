@@ -19,7 +19,9 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
   };
 
   const nights = differenceInDays(new Date(booking.checkOutDate), new Date(booking.checkInDate));
-  const pricePerNight = nights > 0 ? booking.totalAmount / nights : booking.totalAmount;
+  // Use booking.pricePerNight directly
+  const displayPricePerNight = booking.pricePerNight > 0 ? booking.pricePerNight : (nights > 0 ? booking.totalAmount / nights : booking.totalAmount);
+
 
   return (
     <Card className="max-w-3xl mx-auto shadow-xl print:shadow-none print:border-none">
@@ -61,7 +63,7 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
                     <tr className="border-b border-muted">
                       <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-foreground sm:pl-6">Description</th>
                       <th scope="col" className="hidden px-3 py-3.5 text-right text-sm font-semibold text-foreground sm:table-cell">Nights</th>
-                      <th scope="col" className="hidden px-3 py-3.5 text-right text-sm font-semibold text-foreground sm:table-cell">Unit Price</th>
+                      <th scope="col" className="hidden px-3 py-3.5 text-right text-sm font-semibold text-foreground sm:table-cell">Price Per Night</th>
                       <th scope="col" className="py-3.5 pl-3 pr-4 text-right text-sm font-semibold text-foreground sm:pr-6">Amount</th>
                     </tr>
                   </thead>
@@ -71,9 +73,9 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
                         <p className="font-medium text-foreground">Stay at {appName} - Room {booking.roomNumber}</p>
                         <p className="text-muted-foreground">{format(new Date(booking.checkInDate), 'MMM d, yyyy')} - {format(new Date(booking.checkOutDate), 'MMM d, yyyy')}</p>
                       </td>
-                      <td className="hidden px-3 py-4 text-right text-sm text-muted-foreground sm:table-cell">{nights}</td>
+                      <td className="hidden px-3 py-4 text-right text-sm text-muted-foreground sm:table-cell">{nights > 0 ? nights : 1}</td>
                       <td className="hidden px-3 py-4 text-right text-sm text-muted-foreground sm:table-cell">
-                        <span className="inline-flex items-center"><IndianRupee className="h-3.5 w-3.5 mr-0.5" />{pricePerNight.toFixed(2)}</span>
+                        <span className="inline-flex items-center"><IndianRupee className="h-3.5 w-3.5 mr-0.5" />{displayPricePerNight.toFixed(2)}</span>
                       </td>
                       <td className="py-4 pl-3 pr-4 text-right text-sm font-medium text-foreground sm:pr-6">
                         <span className="inline-flex items-center"><IndianRupee className="h-3.5 w-3.5 mr-0.5" />{booking.totalAmount.toFixed(2)}</span>

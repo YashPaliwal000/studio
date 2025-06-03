@@ -10,7 +10,8 @@ export interface Booking {
   checkInDate: Date;
   checkOutDate: Date;
   numberOfGuests: number;
-  totalAmount: number;
+  pricePerNight: number; // New field
+  totalAmount: number; // Will be calculated: pricePerNight * numberOfNights
   status: BookingStatus;
   bookingSource?: BookingSource;
   notes?: string;

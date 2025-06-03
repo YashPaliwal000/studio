@@ -1,22 +1,26 @@
+
 'use client';
 import { useState, useCallback, useEffect } from 'react';
 import type { Booking, BookingStatus } from '@/lib/types';
-import { nanoid } from 'nanoid'; // You might need to install nanoid: npm install nanoid
+import { nanoid } from 'nanoid';
+import { differenceInDays } from 'date-fns';
 
-// Helper to generate unique IDs, nanoid is small and effective
-// For a quick solution without installing, you can use:
-// const generateId = () => Math.random().toString(36).substr(2, 9);
+// Helper to calculate number of nights
+const calculateNights = (checkIn: Date, checkOut: Date): number => {
+  const nights = differenceInDays(new Date(checkOut), new Date(checkIn));
+  return nights > 0 ? nights : 0;
+};
 
-const initialBookings: Booking[] = [
+const initialBookingsData = [
   {
     id: nanoid(),
     guestName: 'Alice Wonderland',
     guestContact: 'alice@example.com',
     roomNumber: 1,
     checkInDate: new Date(new Date().setDate(new Date().getDate() + 1)),
-    checkOutDate: new Date(new Date().setDate(new Date().getDate() + 3)),
+    checkOutDate: new Date(new Date().setDate(new Date().getDate() + 3)), // 2 nights
     numberOfGuests: 2,
-    totalAmount: 300,
+    pricePerNight: 150,
     status: 'Confirmed',
     bookingSource: 'Online',
     createdAt: new Date(),
@@ -27,33 +31,62 @@ const initialBookings: Booking[] = [
     guestContact: 'bob@example.com',
     roomNumber: 2,
     checkInDate: new Date(new Date().setDate(new Date().getDate() + 2)),
-    checkOutDate: new Date(new Date().setDate(new Date().getDate() + 5)),
+    checkOutDate: new Date(new Date().setDate(new Date().getDate() + 5)), // 3 nights
     numberOfGuests: 1,
-    totalAmount: 450,
+    pricePerNight: 120,
     status: 'Confirmed',
     bookingSource: 'Phone',
     createdAt: new Date(),
   },
 ];
 
+// Calculate totalAmount for initial bookings
+const initialBookings: Booking[] = initialBookingsData.map(b => {
+  const nights = calculateNights(b.checkInDate, b.checkOutDate);
+  return {
+    ...b,
+    totalAmount: b.pricePerNight * nights,
+  };
+});
+
 
 export function useBookings() {
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true); // Simulate async loading
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate fetching data
     const storedBookings = localStorage.getItem('homestayBookings');
     if (storedBookings) {
-      setBookings(JSON.parse(storedBookings).map((b: Booking) => ({
-        ...b,
-        checkInDate: new Date(b.checkInDate),
-        checkOutDate: new Date(b.checkOutDate),
-        createdAt: new Date(b.createdAt),
-        updatedAt: b.updatedAt ? new Date(b.updatedAt) : undefined,
-      })));
+      setBookings(JSON.parse(storedBookings).map((b: any) => {
+        const checkInDate = new Date(b.checkInDate);
+        const checkOutDate = new Date(b.checkOutDate);
+        const nights = calculateNights(checkInDate, checkOutDate);
+        
+        // For backward compatibility with old data that might not have pricePerNight
+        let pricePerNight = b.pricePerNight;
+        let totalAmount = b.totalAmount;
+
+        if (typeof b.pricePerNight === 'undefined' && typeof b.totalAmount !== 'undefined') {
+          pricePerNight = nights > 0 ? b.totalAmount / nights : b.totalAmount;
+        } else if (typeof b.pricePerNight !== 'undefined' && typeof b.totalAmount === 'undefined') {
+          totalAmount = b.pricePerNight * nights;
+        } else if (typeof b.pricePerNight === 'undefined' && typeof b.totalAmount === 'undefined') {
+          pricePerNight = 0;
+          totalAmount = 0;
+        }
+
+
+        return {
+          ...b,
+          checkInDate,
+          checkOutDate,
+          pricePerNight: Number(pricePerNight) || 0,
+          totalAmount: Number(totalAmount) || 0,
+          createdAt: new Date(b.createdAt),
+          updatedAt: b.updatedAt ? new Date(b.updatedAt) : undefined,
+        };
+      }));
     } else {
-       // Map initial bookings to ensure Date objects are correct
       setBookings(initialBookings.map(b => ({
         ...b,
         checkInDate: new Date(b.checkInDate),
@@ -65,12 +98,13 @@ export function useBookings() {
   }, []);
 
   useEffect(() => {
-    if (!loading) { // Only save when not initially loading
+    if (!loading) {
       localStorage.setItem('homestayBookings', JSON.stringify(bookings));
     }
   }, [bookings, loading]);
 
   const addBooking = useCallback((newBookingData: Omit<Booking, 'id' | 'createdAt'>) => {
+    // totalAmount should be pre-calculated and passed in newBookingData
     const bookingWithId: Booking = {
       ...newBookingData,
       id: nanoid(),
@@ -81,16 +115,19 @@ export function useBookings() {
   }, []);
 
   const updateBooking = useCallback((id: string, updatedBookingData: Partial<Omit<Booking, 'id' | 'createdAt'>>) => {
+    // totalAmount should be pre-calculated and passed in updatedBookingData if pricePerNight or dates change
+    let finalBooking: Booking | undefined;
     setBookings((prevBookings) =>
-      prevBookings.map((booking) =>
-        booking.id === id
-          ? { ...booking, ...updatedBookingData, updatedAt: new Date() }
-          : booking
-      )
+      prevBookings.map((booking) => {
+        if (booking.id === id) {
+          finalBooking = { ...booking, ...updatedBookingData, updatedAt: new Date() };
+          return finalBooking;
+        }
+        return booking;
+      })
     );
-    const updatedBooking = bookings.find(b => b.id === id);
-    return updatedBooking ? { ...updatedBooking, ...updatedBookingData, updatedAt: new Date() } : undefined;
-  }, [bookings]);
+    return finalBooking;
+  }, []);
 
   const getBookingById = useCallback((id: string) => {
     return bookings.find((booking) => booking.id === id);

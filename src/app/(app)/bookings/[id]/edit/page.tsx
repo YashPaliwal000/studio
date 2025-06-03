@@ -1,17 +1,21 @@
+
 'use client';
 import BookingForm from '@/components/bookings/BookingForm';
+import type { BookingFormValues } from '@/components/bookings/BookingForm';
 import { useBookings } from '@/hooks/useBookings';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { Booking } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button'; // Added import for Button
+import { differenceInDays } from 'date-fns';
 
 export default function EditBookingPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { getBookingById, updateBooking } = useBookings();
-  const [initialData, setInitialData] = useState<Booking | undefined>(undefined);
+  const [initialDataForForm, setInitialDataForForm] = useState<Partial<BookingFormValues> | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,7 +23,14 @@ export default function EditBookingPage() {
     if (id) {
       const booking = getBookingById(id as string);
       if (booking) {
-        setInitialData(booking);
+        // Map Booking to BookingFormValues
+        const { totalAmount, createdAt, updatedAt, ...formData } = booking;
+        setInitialDataForForm({
+          ...formData,
+          checkInDate: new Date(booking.checkInDate), // ensure Date objects
+          checkOutDate: new Date(booking.checkOutDate), // ensure Date objects
+          pricePerNight: booking.pricePerNight, // This is now part of Booking type
+        });
       } else {
         setError('Booking not found.');
       }
@@ -27,15 +38,27 @@ export default function EditBookingPage() {
     }
   }, [id, getBookingById]);
 
-  const handleSubmit = async (data: Partial<Omit<Booking, 'id' | 'createdAt'>>) => {
+  const handleSubmit = async (data: BookingFormValues) => {
     if (!id) return;
-    // Ensure dates are Date objects if not already
-    const bookingData = {
-        ...data,
-        checkInDate: data.checkInDate ? new Date(data.checkInDate) : undefined,
-        checkOutDate: data.checkOutDate ? new Date(data.checkOutDate) : undefined,
+
+    const checkIn = new Date(data.checkInDate);
+    const checkOut = new Date(data.checkOutDate);
+
+    let nights = differenceInDays(checkOut, checkIn);
+     if (nights <= 0) {
+      nights = 1; // Or handle error, form validation should prevent this
+    }
+    const totalAmount = data.pricePerNight * nights;
+
+    // Construct the data to be saved, including calculated totalAmount
+    const bookingDataToUpdate: Partial<Omit<Booking, 'id' | 'createdAt'>> = {
+        ...data, // Spread all form values
+        checkInDate: checkIn,
+        checkOutDate: checkOut,
+        pricePerNight: data.pricePerNight,
+        totalAmount: totalAmount,
       };
-    return updateBooking(id as string, bookingData);
+    return updateBooking(id as string, bookingDataToUpdate);
   };
 
   if (loading) {
@@ -45,7 +68,7 @@ export default function EditBookingPage() {
           <Skeleton className="h-8 w-1/2" />
         </CardHeader>
         <CardContent className="space-y-6">
-          {[...Array(5)].map((_, i) => (
+          {[...Array(6)].map((_, i) => ( // Increased skeleton items for pricePerNight field
             <div key={i} className="space-y-2">
               <Skeleton className="h-4 w-1/4" />
               <Skeleton className="h-10 w-full" />
@@ -66,7 +89,7 @@ export default function EditBookingPage() {
     );
   }
   
-  if (!initialData) {
+  if (!initialDataForForm) {
      return (
       <div className="py-8 text-center">
         <p>Booking data could not be loaded.</p>
@@ -77,7 +100,7 @@ export default function EditBookingPage() {
 
   return (
     <div className="py-8">
-      <BookingForm initialData={initialData} onSubmit={handleSubmit} isEditMode={true} />
+      <BookingForm initialData={initialDataForForm} onSubmit={handleSubmit} isEditMode={true} />
     </div>
   );
 }

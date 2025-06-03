@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -29,14 +30,15 @@ import { ROOM_NUMBERS, BOOKING_STATUSES, BOOKING_SOURCES } from '@/lib/constants
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
+// BookingFormValues will not include totalAmount, as it's calculated by parent
 const bookingFormSchema = z.object({
   guestName: z.string().min(2, { message: 'Guest name must be at least 2 characters.' }),
-  guestContact: z.string().min(5, { message: 'Guest contact is required.' }), // Can be phone or email
+  guestContact: z.string().min(5, { message: 'Guest contact is required.' }),
   roomNumber: z.coerce.number().min(1).max(ROOM_NUMBERS.length),
   checkInDate: z.date({ required_error: 'Check-in date is required.' }),
   checkOutDate: z.date({ required_error: 'Check-out date is required.' }),
   numberOfGuests: z.coerce.number().min(1, { message: 'At least one guest is required.' }),
-  totalAmount: z.coerce.number().positive({ message: 'Total amount must be positive.' }),
+  pricePerNight: z.coerce.number().positive({ message: 'Price per night must be positive.' }),
   status: z.enum(BOOKING_STATUSES),
   bookingSource: z.enum(BOOKING_SOURCES).optional(),
   notes: z.string().optional(),
@@ -45,11 +47,12 @@ const bookingFormSchema = z.object({
   path: ["checkOutDate"],
 });
 
-type BookingFormValues = z.infer<typeof bookingFormSchema>;
+// This type is for the form's own data
+export type BookingFormValues = z.infer<typeof bookingFormSchema>;
 
 interface BookingFormProps {
-  initialData?: Booking;
-  onSubmit: (data: BookingFormValues) => Promise<Booking | void>;
+  initialData?: Partial<BookingFormValues & { checkInDate: Date, checkOutDate: Date}>; // For edit mode, pass values according to form schema
+  onSubmit: (data: BookingFormValues) => Promise<any>; // Parent will handle calculating totalAmount
   isEditMode?: boolean;
 }
 
@@ -61,15 +64,15 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false 
     resolver: zodResolver(bookingFormSchema),
     defaultValues: initialData ? {
         ...initialData,
-        roomNumber: initialData.roomNumber,
-        checkInDate: new Date(initialData.checkInDate),
-        checkOutDate: new Date(initialData.checkOutDate),
+        // Ensure dates are Date objects if passed as strings from initialData source
+        checkInDate: initialData.checkInDate ? new Date(initialData.checkInDate) : undefined,
+        checkOutDate: initialData.checkOutDate ? new Date(initialData.checkOutDate) : undefined,
       } : {
       guestName: '',
       guestContact: '',
       roomNumber: ROOM_NUMBERS[0],
       numberOfGuests: 1,
-      totalAmount: 0,
+      pricePerNight: 1500, // Default price per night
       status: 'Confirmed',
       notes: '',
     },
@@ -77,16 +80,16 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false 
 
   async function handleSubmit(data: BookingFormValues) {
     try {
-      await onSubmit(data);
+      await onSubmit(data); // onSubmit prop now expects BookingFormValues
       toast({
         title: isEditMode ? 'Booking Updated' : 'Booking Created',
         description: `Booking for ${data.guestName} has been successfully ${isEditMode ? 'updated' : 'created'}.`,
       });
-      router.push('/bookings'); // Redirect to bookings list after submission
+      router.push('/bookings');
     } catch (error) {
       toast({
         title: 'Error',
-        description: `Failed to ${isEditMode ? 'update' : 'create'} booking. Please try again.`,
+        description: `Failed to ${isEditMode ? 'update' : 'create'} booking. Please try again. Error: ${error instanceof Error ? error.message : String(error)}`,
         variant: 'destructive',
       });
     }
@@ -196,12 +199,12 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false 
             </div>
              <FormField
                 control={form.control}
-                name="totalAmount"
+                name="pricePerNight"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Total Amount (₹)</FormLabel>
+                    <FormLabel>Price Per Night (₹)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" placeholder="e.g., 250.00" {...field} />
+                      <Input type="number" step="0.01" placeholder="e.g., 1500.00" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
