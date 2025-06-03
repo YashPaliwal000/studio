@@ -1,3 +1,4 @@
+
 'use client';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -5,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { Booking } from '@/lib/types';
-import { Edit, Trash2, User, Phone, CalendarDays, BedDouble, Users, IndianRupee, CheckCircle, Info, PackageOpen } from 'lucide-react';
+import { Edit, Trash2, User, Phone, CalendarDays, BedDouble, Users, IndianRupee, CheckCircle, Info, PackageOpen, FileText } from 'lucide-react';
 
 interface BookingCardProps {
   booking: Booking;
@@ -22,7 +23,7 @@ const statusColors: { [key in Booking['status']]: string } = {
 
 export default function BookingCard({ booking, onDelete }: BookingCardProps) {
   return (
-    <Card className="shadow-lg hover:shadow-xl transition-shadow w-full">
+    <Card className="shadow-lg hover:shadow-xl transition-shadow w-full flex flex-col">
       <CardHeader>
         <div className="flex justify-between items-start">
           <div>
@@ -32,7 +33,7 @@ export default function BookingCard({ booking, onDelete }: BookingCardProps) {
           <Badge className={`${statusColors[booking.status]} text-white`}>{booking.status}</Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
+      <CardContent className="space-y-3 text-sm flex-grow">
         <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /> Guest Contact: {booking.guestContact}</div>
         <div className="flex items-center gap-2"><BedDouble className="h-4 w-4 text-muted-foreground" /> Room: {booking.roomNumber}</div>
         <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Check-in: {format(new Date(booking.checkInDate), 'PPP')}</div>
@@ -42,7 +43,12 @@ export default function BookingCard({ booking, onDelete }: BookingCardProps) {
         {booking.bookingSource && <div className="flex items-center gap-2"><PackageOpen className="h-4 w-4 text-muted-foreground" /> Source: {booking.bookingSource}</div>}
         {booking.notes && <div className="flex items-start gap-2"><Info className="h-4 w-4 text-muted-foreground mt-1" /> Notes: <span className="italic">{booking.notes}</span></div>}
       </CardContent>
-      <CardFooter className="flex justify-end gap-2">
+      <CardFooter className="flex justify-end gap-2 flex-wrap">
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/bookings/${booking.id}/invoice`}>
+            <FileText className="mr-1 h-4 w-4" /> Invoice
+          </Link>
+        </Button>
         <Button variant="outline" size="sm" asChild>
           <Link href={`/bookings/${booking.id}/edit`}>
             <Edit className="mr-1 h-4 w-4" /> Edit
