@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { Booking } from '@/lib/types';
-import { Edit, Trash2, User, Phone, CalendarDays, BedDouble, Users, DollarSign, CheckCircle, Info, PackageOpen } from 'lucide-react';
+import { Edit, Trash2, User, Phone, CalendarDays, BedDouble, Users, IndianRupee, CheckCircle, Info, PackageOpen } from 'lucide-react';
 
 interface BookingCardProps {
   booking: Booking;
@@ -38,7 +38,7 @@ export default function BookingCard({ booking, onDelete }: BookingCardProps) {
         <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Check-in: {format(new Date(booking.checkInDate), 'PPP')}</div>
         <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Check-out: {format(new Date(booking.checkOutDate), 'PPP')}</div>
         <div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /> Guests: {booking.numberOfGuests}</div>
-        <div className="flex items-center gap-2"><DollarSign className="h-4 w-4 text-muted-foreground" /> Amount: ${booking.totalAmount.toFixed(2)}</div>
+        <div className="flex items-center gap-2"><IndianRupee className="h-4 w-4 text-muted-foreground" /> Amount: ₹{booking.totalAmount.toFixed(2)}</div>
         {booking.bookingSource && <div className="flex items-center gap-2"><PackageOpen className="h-4 w-4 text-muted-foreground" /> Source: {booking.bookingSource}</div>}
         {booking.notes && <div className="flex items-start gap-2"><Info className="h-4 w-4 text-muted-foreground mt-1" /> Notes: <span className="italic">{booking.notes}</span></div>}
       </CardContent>

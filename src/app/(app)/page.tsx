@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, BedDouble, CalendarCheck, DollarSign, UserPlus } from 'lucide-react';
+import { ArrowRight, BedDouble, CalendarCheck, IndianRupee, UserPlus } from 'lucide-react';
 
 export default function DashboardPage() {
   const summaryStats = [
     { title: "Today's Arrivals", value: "3", icon: <CalendarCheck className="h-6 w-6 text-primary" />, link: "/checkin", linkText: "View Check-ins" },
     { title: "Available Rooms", value: "2 / 4", icon: <BedDouble className="h-6 w-6 text-primary" />, link: "/calendar", linkText: "View Calendar" },
-    { title: "Today's Revenue (Est.)", value: "$450", icon: <DollarSign className="h-6 w-6 text-primary" />, link: "/revenue", linkText: "View Reports" },
+    { title: "Today's Revenue (Est.)", value: "₹450", icon: <IndianRupee className="h-6 w-6 text-primary" />, link: "/revenue", linkText: "View Reports" },
   ];
 
   const quickActions = [
