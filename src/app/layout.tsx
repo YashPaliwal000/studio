@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Homestay Hub',
+  title: 'Palis Nest',
   description: 'Billing and Management for Homestays',
 };
 
