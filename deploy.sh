@@ -17,6 +17,12 @@ sudo apt-get install -y certbot python3-certbot-nginx
 # Install PM2 globally
 sudo npm install -g pm2
 
+# Fix permissions
+echo "Fixing permissions..."
+sudo chown -R ubuntu:ubuntu /home/ubuntu/studio
+sudo chmod -R 755 /home/ubuntu/studio
+rm -rf .next
+
 # Install project dependencies
 npm install
 
