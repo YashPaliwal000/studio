@@ -54,8 +54,8 @@ export default function BookingCard({ booking, onDelete }: BookingCardProps) {
         <div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /> Guests: {booking.numberOfGuests}</div>
         <div className="flex items-center gap-2">
           <IndianRupee className="h-4 w-4 text-muted-foreground" />
-          {booking.roomPrices.length > 1 ? `Avg. {'\u20B9'}${averagePricePerNight.toFixed(2)}/night | ` : (booking.roomPrices[0] ? `Price {'\u20B9'}${booking.roomPrices[0].price.toFixed(2)}/night | ` : '')}
-          Total: {'\u20B9'}{booking.totalAmount.toFixed(2)}
+          {booking.roomPrices.length > 1 ? `Avg. ₹${averagePricePerNight.toFixed(2)}/night | ` : (booking.roomPrices[0] ? `Price ₹${booking.roomPrices[0].price.toFixed(2)}/night | ` : '')}
+          Total: ₹{booking.totalAmount.toFixed(2)}
         </div>
         {booking.bookingSource && <div className="flex items-center gap-2"><PackageOpen className="h-4 w-4 text-muted-foreground" /> Source: {booking.bookingSource}</div>}
         {booking.notes && <div className="flex items-start gap-2"><Info className="h-4 w-4 text-muted-foreground mt-1" /> Notes: <span className="italic">{booking.notes}</span></div>}

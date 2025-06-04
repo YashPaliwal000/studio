@@ -17,7 +17,7 @@ const getDashboardSummary = () => {
   return {
     todayArrivals,
     availableRoomsDisplay: `${availableRooms} / ${totalRooms}`,
-    todaysRevenue: `\u20B9${todaysRevenue}`,
+    todaysRevenue: `₹${todaysRevenue}`,
   };
 };
 

@@ -49,9 +49,9 @@ export default function RevenueStats({ bookings }: RevenueStatsProps) {
     const totalGuests = relevantBookings.reduce((sum, b) => sum + b.numberOfGuests, 0);
 
     return [
-      { title: 'Total Revenue', value: `\u20B9${totalRevenue.toFixed(2)}`, icon: <IndianRupee className="h-5 w-5 text-muted-foreground" /> },
+      { title: 'Total Revenue', value: `₹${totalRevenue.toFixed(2)}`, icon: <IndianRupee className="h-5 w-5 text-muted-foreground" /> },
       { title: 'Occupancy Rate (Last 30d)', value: `${occupancyRate.toFixed(1)}%`, icon: <Percent className="h-5 w-5 text-muted-foreground" /> },
-      { title: 'Avg. Booking Value', value: `\u20B9${averageBookingValue.toFixed(2)}`, icon: <TrendingUp className="h-5 w-5 text-muted-foreground" /> },
+      { title: 'Avg. Booking Value', value: `₹${averageBookingValue.toFixed(2)}`, icon: <TrendingUp className="h-5 w-5 text-muted-foreground" /> },
       { title: 'Total Guests (All Time)', value: totalGuests.toString(), icon: <Users className="h-5 w-5 text-muted-foreground" /> },
     ];
   }, [bookings]);
