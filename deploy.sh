@@ -11,6 +11,9 @@ sudo apt-get install -y nodejs
 # Install Nginx
 sudo apt-get install -y nginx
 
+# Install Certbot and Nginx plugin
+sudo apt-get install -y certbot python3-certbot-nginx
+
 # Install PM2 globally
 sudo npm install -g pm2
 
@@ -27,7 +30,7 @@ server {
     server_name palisnest.in www.palisnest.in;
 
     location / {
-        proxy_pass http://localhost:9002;
+        proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -46,6 +49,9 @@ sudo nginx -t
 
 # Restart Nginx
 sudo systemctl restart nginx
+
+# Obtain SSL certificate
+sudo certbot --nginx -d palisnest.in -d www.palisnest.in --non-interactive --agree-tos --email your-email@example.com
 
 # Start the application with PM2
 pm2 start npm --name "next-app" -- start
