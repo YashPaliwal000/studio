@@ -1,52 +1,5 @@
 [
   {
-    "id": "init-alice-wonderland",
-    "guestName": "Alice Wonderland",
-    "guestContact": "alice@example.com",
-    "roomNumbers": [
-      1
-    ],
-    "checkInDate": "2025-06-04T10:52:20.486Z",
-    "checkOutDate": "2025-06-06T10:52:20.486Z",
-    "numberOfGuests": 2,
-    "totalAmount": 300,
-    "status": "Confirmed",
-    "bookingSource": "Online",
-    "createdAt": "2025-06-03T10:52:20.486Z",
-    "roomPrices": [
-      {
-        "roomNumber": 1,
-        "price": 150
-      }
-    ]
-  },
-  {
-    "id": "init-bob-builder",
-    "guestName": "Bob The Builder",
-    "guestContact": "bob@example.com",
-    "roomNumbers": [
-      2,
-      3
-    ],
-    "checkInDate": "2025-06-05T10:52:20.486Z",
-    "checkOutDate": "2025-06-08T10:52:20.486Z",
-    "numberOfGuests": 3,
-    "totalAmount": 720,
-    "status": "Confirmed",
-    "bookingSource": "Phone",
-    "createdAt": "2025-06-03T10:52:20.486Z",
-    "roomPrices": [
-      {
-        "roomNumber": 2,
-        "price": 120
-      },
-      {
-        "roomNumber": 3,
-        "price": 120
-      }
-    ]
-  },
-  {
     "guestName": "Yash",
     "guestContact": "yahcapstan@gmail.com",
     "roomNumbers": [
@@ -69,56 +22,51 @@
   },
   {
     "guestName": "Kamal",
-    "guestContact": "9761981086",
+    "guestContact": "kamal@gmail.com",
     "roomNumbers": [
-      1,
-      3
-    ],
-    "checkInDate": "2025-06-03T18:30:00.000Z",
-    "checkOutDate": "2025-06-05T18:30:00.000Z",
-    "numberOfGuests": 4,
-    "status": "Confirmed",
-    "bookingSource": "Walk-in",
-    "notes": "",
-    "totalAmount": 24000,
-    "id": "1EmRRVcJdLJsdXvuHlWQ_",
-    "createdAt": "2025-06-04T07:41:25.000Z",
-    "roomPrices": [
-      {
-        "roomNumber": 1,
-        "price": 6000
-      },
-      {
-        "roomNumber": 3,
-        "price": 6000
-      }
-    ]
-  },
-  {
-    "guestName": "Rajesh",
-    "guestContact": "yashpaliwal42@gmail.com",
-    "roomNumbers": [
-      1,
-      3
+      2
     ],
     "checkInDate": "2025-06-03T18:30:00.000Z",
     "checkOutDate": "2025-06-04T18:30:00.000Z",
-    "numberOfGuests": 5,
+    "numberOfGuests": 2,
     "roomPrices": [
       {
-        "roomNumber": 1,
-        "price": 3500
-      },
-      {
-        "roomNumber": 3,
-        "price": 1500
+        "roomNumber": 2,
+        "price": 2500
       }
     ],
-    "totalAmount": 5000,
+    "totalAmount": 2500,
     "status": "Confirmed",
     "bookingSource": "Phone",
     "notes": "",
-    "id": "2t09sUBJzPAXop_NFK5wG",
-    "createdAt": "2025-06-04T07:47:28.659Z"
+    "id": "tVrIsdhqurSyAxwg-ndje",
+    "createdAt": "2025-06-04T08:32:21.865Z"
+  },
+  {
+    "guestName": "Somesh",
+    "guestContact": "9897074513",
+    "roomNumbers": [
+      3,
+      4
+    ],
+    "checkInDate": "2025-06-03T18:30:00.000Z",
+    "checkOutDate": "2025-06-06T18:30:00.000Z",
+    "numberOfGuests": 4,
+    "roomPrices": [
+      {
+        "roomNumber": 3,
+        "price": 3000
+      },
+      {
+        "roomNumber": 4,
+        "price": 1500
+      }
+    ],
+    "totalAmount": 13500,
+    "status": "Confirmed",
+    "bookingSource": "Phone",
+    "notes": "",
+    "id": "sqG-b4dYs-M_7Gqu8TDTH",
+    "createdAt": "2025-06-04T08:33:43.154Z"
   }
 ]

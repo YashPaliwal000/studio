@@ -27,7 +27,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import type { Booking, BookingStatus, BookingSource, RoomPrice } from '@/lib/types';
-import { ROOM_NUMBERS, BOOKING_STATUSES, BOOKING_SOURCES } from '@/lib/constants';
+import { ROOM_CONFIG, BOOKING_STATUSES, BOOKING_SOURCES } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
@@ -37,7 +37,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 
 const roomPriceDetailSchema = z.object({
-  roomNumber: z.number(),
+  roomNumber: z.number(), // This refers to room ID
   price: z.coerce.number().positive({ message: 'Price for each room must be positive.' }),
 });
 
@@ -74,12 +74,15 @@ interface BookingFormProps {
   currentBookingId?: string;
 }
 
-const DEFAULT_ROOM_PRICE = 1500;
-
 export default function BookingForm({ initialData, onSubmit, isEditMode = false, currentBookingId }: BookingFormProps) {
   const { toast } = useToast();
   const router = useRouter();
   const { bookings: allBookings, loading: bookingsLoading } = useBookings();
+
+  const getDefaultPriceForRoom = (roomId: number) => {
+    const room = ROOM_CONFIG.find(r => r.id === roomId);
+    return room ? room.defaultPrice : 1500; // Fallback, though should always find
+  };
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema),
@@ -89,7 +92,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
         checkOutDate: initialData.checkOutDate ? new Date(initialData.checkOutDate) : undefined,
         roomNumbers: initialData.roomNumbers || [],
         roomPriceDetails: initialData.roomPrices?.map(rp => ({ roomNumber: rp.roomNumber, price: rp.price })) ||
-                          initialData.roomNumbers?.map(rn => ({ roomNumber: rn, price: (initialData as any).pricePerNight || DEFAULT_ROOM_PRICE })) || [],
+                          initialData.roomNumbers?.map(rn => ({ roomNumber: rn, price: getDefaultPriceForRoom(rn) })) || [],
       } : {
       guestName: '',
       guestContact: '',
@@ -101,7 +104,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
     },
   });
 
-  const { fields: roomPriceFields, append, remove } = useFieldArray({
+  const { fields: roomPriceFields, append, remove, update } = useFieldArray({
     control: form.control,
     name: "roomPriceDetails",
   });
@@ -115,7 +118,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
     const conflicts = new Set<number>();
 
     for (const booking of allBookings) {
-      if (currentBookingId && booking.id === currentBookingId) continue; // Skip self in edit mode
+      if (currentBookingId && booking.id === currentBookingId) continue; 
       if (booking.status === 'Cancelled') continue;
 
       const existingCheckIn = new Date(booking.checkInDate);
@@ -152,7 +155,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
 
     newSelectedRoomNumbersSet.forEach(rn => {
       if (!currentRoomPriceNumbers.has(rn)) {
-        append({ roomNumber: rn, price: DEFAULT_ROOM_PRICE });
+        append({ roomNumber: rn, price: getDefaultPriceForRoom(rn) });
       }
     });
 
@@ -229,15 +232,15 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                   <div className="mb-2">
                     <FormLabel className="text-base">Select Rooms</FormLabel>
                     <FormDescription>
-                      Choose one or more rooms for this booking. Unavailable rooms for selected dates are disabled.
+                      Choose one or more rooms. Unavailable rooms for selected dates are disabled.
                     </FormDescription>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {ROOM_NUMBERS.map((roomNum) => {
-                    const isRoomConflicting = conflictingRooms.has(roomNum);
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {ROOM_CONFIG.map((room) => {
+                    const isRoomConflicting = conflictingRooms.has(room.id);
                     return (
                       <FormField
-                        key={roomNum}
+                        key={room.id}
                         control={form.control}
                         name="roomNumbers"
                         render={({ field }) => {
@@ -252,14 +255,14 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                                 >
                                   <FormControl>
                                     <Checkbox
-                                      checked={field.value?.includes(roomNum)}
+                                      checked={field.value?.includes(room.id)}
                                       onCheckedChange={(checked) => {
-                                        if (isRoomConflicting && checked) return; // Prevent checking a disabled room
+                                        if (isRoomConflicting && checked) return; 
                                         return checked
-                                          ? field.onChange([...(field.value || []), roomNum])
+                                          ? field.onChange([...(field.value || []), room.id])
                                           : field.onChange(
                                               (field.value || []).filter(
-                                                (value) => value !== roomNum
+                                                (value) => value !== room.id
                                               )
                                             )
                                       }}
@@ -268,13 +271,13 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                                     />
                                   </FormControl>
                                   <FormLabel className={cn("font-normal", isRoomConflicting && "cursor-not-allowed")}>
-                                    Room {roomNum}
+                                    {room.name} (₹{room.defaultPrice})
                                   </FormLabel>
                                 </FormItem>
                               </TooltipTrigger>
                               {isRoomConflicting && (
                                 <TooltipContent side="bottom">
-                                  <p className="flex items-center gap-1"><InfoIcon className="h-4 w-4" /> Room {roomNum} is booked for these dates.</p>
+                                  <p className="flex items-center gap-1"><InfoIcon className="h-4 w-4" /> {room.name} is booked for these dates.</p>
                                 </TooltipContent>
                               )}
                             </Tooltip>
@@ -292,22 +295,24 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
             {selectedRoomNumbersInForm && selectedRoomNumbersInForm.length > 0 && (
               <div className="space-y-4">
                 <FormLabel className="text-base">Room Prices (Per Night)</FormLabel>
-                {roomPriceFields.map((field, index) => (
+                {roomPriceFields.map((field, index) => {
+                  const roomDetails = ROOM_CONFIG.find(r => r.id === field.roomNumber);
+                  return (
                    <FormField
                     key={field.id}
                     control={form.control}
                     name={`roomPriceDetails.${index}.price`}
                     render={({ field: priceField }) => (
                       <FormItem className="flex flex-row items-center gap-4 p-3 border rounded-md">
-                        <FormLabel className="min-w-[80px]">Room {roomPriceFields[index].roomNumber}:</FormLabel>
+                        <FormLabel className="min-w-[120px] sm:min-w-[150px]">{roomDetails?.name || `Room ${field.roomNumber}`}:</FormLabel>
                         <FormControl>
                            <div className="relative w-full">
-                            <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <span className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground">₹</span>
                             <Input
                               type="number"
-                              placeholder={`Price for room ${roomPriceFields[index].roomNumber}`}
+                              placeholder={`Price for ${roomDetails?.name || `Room ${field.roomNumber}`}`}
                               {...priceField}
-                              className="pl-9"
+                              className="pl-7" // Adjusted padding for Rupee symbol
                             />
                           </div>
                         </FormControl>
@@ -315,7 +320,8 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                       </FormItem>
                     )}
                   />
-                ))}
+                  );
+                })}
                  <FormMessage>{form.formState.errors.roomPriceDetails?.message || form.formState.errors.roomPriceDetails?.root?.message}</FormMessage>
               </div>
             )}

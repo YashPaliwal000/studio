@@ -1,13 +1,34 @@
+
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, BedDouble, CalendarCheck, IndianRupee, UserPlus } from 'lucide-react';
+import { ROOM_CONFIG } from '@/lib/constants'; // Assuming this will be needed for dynamic data
+
+// Placeholder data for dashboard stats - replace with dynamic data fetching
+const getDashboardSummary = () => {
+  // In a real app, this data would come from useBookings or a similar hook/API call
+  const todayArrivals = "3"; // Example
+  const totalRooms = ROOM_CONFIG.length;
+  const occupiedRoomsToday = 2; // Example: fetch from bookings for today
+  const availableRooms = totalRooms - occupiedRoomsToday;
+  const todaysRevenue = "4500"; // Example
+
+  return {
+    todayArrivals,
+    availableRoomsDisplay: `${availableRooms} / ${totalRooms}`,
+    todaysRevenue: `₹${todaysRevenue}`,
+  };
+};
+
 
 export default function DashboardPage() {
+  const summary = getDashboardSummary();
+
   const summaryStats = [
-    { title: "Today's Arrivals", value: "3", icon: <CalendarCheck className="h-6 w-6 text-primary" />, link: "/checkin", linkText: "View Check-ins" },
-    { title: "Available Rooms", value: "2 / 4", icon: <BedDouble className="h-6 w-6 text-primary" />, link: "/calendar", linkText: "View Calendar" },
-    { title: "Today's Revenue (Est.)", value: "₹450", icon: <IndianRupee className="h-6 w-6 text-primary" />, link: "/revenue", linkText: "View Reports" },
+    { title: "Today's Arrivals", value: summary.todayArrivals, icon: <CalendarCheck className="h-6 w-6 text-primary" />, link: "/checkin", linkText: "View Check-ins" },
+    { title: "Available Rooms", value: summary.availableRoomsDisplay, icon: <BedDouble className="h-6 w-6 text-primary" />, link: "/calendar", linkText: "View Calendar" },
+    { title: "Today's Revenue (Est.)", value: summary.todaysRevenue, icon: <IndianRupee className="h-6 w-6 text-primary" />, link: "/revenue", linkText: "View Reports" },
   ];
 
   const quickActions = [

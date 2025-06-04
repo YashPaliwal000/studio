@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { Booking } from '@/lib/types';
+import { ROOM_CONFIG } from '@/lib/constants';
 import { Edit, Trash2, User, Phone, CalendarDays, BedDouble, Users, IndianRupee, CheckCircle, Info, PackageOpen, FileText } from 'lucide-react';
 
 interface BookingCardProps {
@@ -20,11 +21,19 @@ const statusColors: { [key in Booking['status']]: string } = {
   Cancelled: 'bg-red-500 hover:bg-red-600',
 };
 
+const getRoomNames = (roomIds: number[]): string => {
+  return roomIds.map(id => {
+    const room = ROOM_CONFIG.find(r => r.id === id);
+    return room ? room.name : `Room ${id}`;
+  }).join(', ');
+};
 
 export default function BookingCard({ booking, onDelete }: BookingCardProps) {
-  const averagePricePerNight = booking.roomPrices.length > 0 
+  const averagePricePerNight = booking.roomPrices.length > 0
     ? booking.roomPrices.reduce((sum, rp) => sum + rp.price, 0) / booking.roomPrices.length
     : 0;
+  
+  const roomNames = getRoomNames(booking.roomNumbers);
 
   return (
     <Card className="shadow-lg hover:shadow-xl transition-shadow w-full flex flex-col">
@@ -39,14 +48,13 @@ export default function BookingCard({ booking, onDelete }: BookingCardProps) {
       </CardHeader>
       <CardContent className="space-y-3 text-sm flex-grow">
         <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /> Guest Contact: {booking.guestContact}</div>
-        <div className="flex items-center gap-2"><BedDouble className="h-4 w-4 text-muted-foreground" /> Rooms: {booking.roomNumbers.join(', ')}</div>
+        <div className="flex items-center gap-2"><BedDouble className="h-4 w-4 text-muted-foreground" /> Rooms: {roomNames}</div>
         <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Check-in: {format(new Date(booking.checkInDate), 'PPP')}</div>
         <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Check-out: {format(new Date(booking.checkOutDate), 'PPP')}</div>
         <div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /> Guests: {booking.numberOfGuests}</div>
-        {/* Displaying average price per night if multiple rooms with different prices, or total amount */}
         <div className="flex items-center gap-2">
-          <IndianRupee className="h-4 w-4 text-muted-foreground" /> 
-          {booking.roomPrices.length > 1 ? `Avg. ₹${averagePricePerNight.toFixed(2)}/night | ` : ''}
+          <IndianRupee className="h-4 w-4 text-muted-foreground" />
+          {booking.roomPrices.length > 1 ? `Avg. ₹${averagePricePerNight.toFixed(2)}/night | ` : (booking.roomPrices[0] ? `₹${booking.roomPrices[0].price.toFixed(2)}/night | ` : '')}
           Total: ₹{booking.totalAmount.toFixed(2)}
         </div>
         {booking.bookingSource && <div className="flex items-center gap-2"><PackageOpen className="h-4 w-4 text-muted-foreground" /> Source: {booking.bookingSource}</div>}

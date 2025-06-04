@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import type { Booking, RoomPrice } from '@/lib/types';
+import { ROOM_CONFIG } from '@/lib/constants';
 import { differenceInDays } from 'date-fns';
 
 const dataDirectory = path.join(process.cwd(), 'data');
@@ -24,23 +25,24 @@ async function ensureDataFileExists(): Promise<Booking[]> {
   try {
     const fileData = await fs.readFile(dataFilePath, 'utf-8');
     const bookingsFromFile = JSON.parse(fileData) as any[];
-    // Migrate old data if necessary
     return bookingsFromFile.map(b => {
-      if (!b.roomPrices && b.pricePerNight) {
+      if (!b.roomPrices && b.pricePerNight) { // Old data with pricePerNight
         const nights = calculateNights(b.checkInDate, b.checkOutDate);
         b.roomPrices = b.roomNumbers.map((rn: number) => ({
           roomNumber: rn,
           price: b.pricePerNight,
         }));
-        // Recalculate totalAmount based on new structure if pricePerNight was per room per night
         b.totalAmount = b.roomPrices.reduce((sum: number, rp: RoomPrice) => sum + (rp.price * nights), 0);
         delete b.pricePerNight;
-      } else if (!b.roomPrices) { // Fallback if even pricePerNight is missing
+      } else if (!b.roomPrices) { // Fallback if no price info at all
          const nights = calculateNights(b.checkInDate, b.checkOutDate);
-         b.roomPrices = b.roomNumbers.map((rn: number) => ({
-            roomNumber: rn,
-            price: 1500, // Default price
-         }));
+         b.roomPrices = b.roomNumbers.map((rn: number) => {
+            const roomConfig = ROOM_CONFIG.find(rc => rc.id === rn);
+            return {
+                roomNumber: rn,
+                price: roomConfig ? roomConfig.defaultPrice : 1500, 
+            };
+         });
          b.totalAmount = b.roomPrices.reduce((sum: number, rp: RoomPrice) => sum + (rp.price * nights), 0);
       }
       return b as Booking;
@@ -63,11 +65,11 @@ const getInitialBookingsForFile = (): Booking[] => {
       id: 'init-alice-wonderland',
       guestName: 'Alice Wonderland',
       guestContact: 'alice@example.com',
-      roomNumbers: [1],
+      roomNumbers: [ROOM_CONFIG[0].id], // Use ID from ROOM_CONFIG
       checkInDate: new Date(new Date(today).setDate(today.getDate() + 1)).toISOString(),
       checkOutDate: new Date(new Date(today).setDate(today.getDate() + 3)).toISOString(),
       numberOfGuests: 2,
-      roomPrices: [{ roomNumber: 1, price: 150 }],
+      roomPrices: [{ roomNumber: ROOM_CONFIG[0].id, price: ROOM_CONFIG[0].defaultPrice }],
       status: 'Confirmed',
       bookingSource: 'Online',
       createdAt: new Date().toISOString(),
@@ -76,13 +78,13 @@ const getInitialBookingsForFile = (): Booking[] => {
       id: 'init-bob-builder',
       guestName: 'Bob The Builder',
       guestContact: 'bob@example.com',
-      roomNumbers: [2, 3],
+      roomNumbers: [ROOM_CONFIG[1].id, ROOM_CONFIG[2].id], // Use IDs
       checkInDate: new Date(new Date(today).setDate(today.getDate() + 2)).toISOString(),
       checkOutDate: new Date(new Date(today).setDate(today.getDate() + 5)).toISOString(),
       numberOfGuests: 3,
       roomPrices: [
-        { roomNumber: 2, price: 120 },
-        { roomNumber: 3, price: 130 },
+        { roomNumber: ROOM_CONFIG[1].id, price: ROOM_CONFIG[1].defaultPrice },
+        { roomNumber: ROOM_CONFIG[2].id, price: ROOM_CONFIG[2].defaultPrice },
       ],
       status: 'Confirmed',
       bookingSource: 'Phone',
@@ -116,8 +118,7 @@ export async function POST(request: NextRequest) {
     }
 
     const bookingsToWrite = bookingsPayload.map(booking => {
-      // Ensure dates are ISO strings and roomPrices exists
-      const { pricePerNight, ...bookingData } = booking as any; // remove old field if present
+      const { pricePerNight, ...bookingData } = booking as any; 
       
       if (!bookingData.roomPrices && pricePerNight) {
          const nights = calculateNights(bookingData.checkInDate, bookingData.checkOutDate);
@@ -126,19 +127,21 @@ export async function POST(request: NextRequest) {
             price: pricePerNight
          }));
          bookingData.totalAmount = bookingData.roomPrices.reduce((sum: number, rp: RoomPrice) => sum + (rp.price * nights), 0);
-      } else if (!bookingData.roomPrices) { // Fallback for safety
+      } else if (!bookingData.roomPrices) { 
          const nights = calculateNights(bookingData.checkInDate, bookingData.checkOutDate);
-         bookingData.roomPrices = bookingData.roomNumbers.map((rn: number) => ({
-            roomNumber: rn,
-            price: 1500, // Default price
-         }));
+         bookingData.roomPrices = bookingData.roomNumbers.map((rn: number) => {
+            const roomConfig = ROOM_CONFIG.find(rc => rc.id === rn);
+            return {
+                roomNumber: rn,
+                price: roomConfig ? roomConfig.defaultPrice : 1500,
+            };
+         });
          bookingData.totalAmount = bookingData.roomPrices.reduce((sum: number, rp: RoomPrice) => sum + (rp.price * nights), 0);
       }
 
-
       return {
       ...bookingData,
-      roomNumbers: Array.isArray(bookingData.roomNumbers) ? bookingData.roomNumbers : (typeof bookingData.roomNumber === 'number' ? [bookingData.roomNumber] : [1]),
+      roomNumbers: Array.isArray(bookingData.roomNumbers) ? bookingData.roomNumbers : (typeof bookingData.roomNumber === 'number' ? [bookingData.roomNumber] : [ROOM_CONFIG[0].id]),
       roomPrices: Array.isArray(bookingData.roomPrices) ? bookingData.roomPrices : [],
       checkInDate: new Date(bookingData.checkInDate).toISOString(),
       checkOutDate: new Date(bookingData.checkOutDate).toISOString(),
@@ -146,8 +149,6 @@ export async function POST(request: NextRequest) {
       updatedAt: bookingData.updatedAt ? new Date(bookingData.updatedAt).toISOString() : undefined,
     }});
 
-    // ensureDataFileExists will handle creation or migration if file is read first.
-    // Here we are directly writing, so ensureDataFileExists is mainly for directory creation.
     try {
       await fs.access(dataDirectory);
     } catch {

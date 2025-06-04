@@ -2,6 +2,7 @@
 'use client';
 import { useState, useCallback, useEffect } from 'react';
 import type { Booking, BookingStatus, BookingSource, RoomPrice } from '@/lib/types';
+import { ROOM_CONFIG } from '@/lib/constants';
 import { nanoid } from 'nanoid';
 import { differenceInDays } from 'date-fns';
 
@@ -10,8 +11,6 @@ const calculateNights = (checkIn: Date, checkOut: Date): number => {
   return nights > 0 ? nights : 1;
 };
 
-const DEFAULT_ROOM_PRICE_FALLBACK = 1500;
-
 const generateClientInitialBookings = (): Booking[] => {
   const today = new Date();
   const initialDataRaw = [
@@ -19,12 +18,11 @@ const generateClientInitialBookings = (): Booking[] => {
       id: nanoid(),
       guestName: 'Charlie Fallback',
       guestContact: 'charlie@example.com',
-      roomNumbers: [3],
+      roomNumbers: [ROOM_CONFIG[0].id],
       checkInDate: new Date(new Date(today).setDate(today.getDate() + 5)),
       checkOutDate: new Date(new Date(today).setDate(today.getDate() + 7)),
       numberOfGuests: 2,
-      // Provide initial roomPrices structure
-      roomPrices: [{ roomNumber: 3, price: 160 }],
+      roomPrices: [{ roomNumber: ROOM_CONFIG[0].id, price: ROOM_CONFIG[0].defaultPrice }],
       status: 'Confirmed' as BookingStatus,
       bookingSource: 'Online' as BookingSource,
       createdAt: new Date(),
@@ -49,28 +47,29 @@ export function useBookings() {
   const parseBookingData = (booking: any): Booking => {
     const parsed = {
       ...booking,
-      roomNumbers: Array.isArray(booking.roomNumbers) ? booking.roomNumbers : (typeof booking.roomNumber === 'number' ? [booking.roomNumber] : [1]),
+      roomNumbers: Array.isArray(booking.roomNumbers) ? booking.roomNumbers : (typeof booking.roomNumber === 'number' ? [booking.roomNumber] : [ROOM_CONFIG[0].id]),
       checkInDate: new Date(booking.checkInDate),
       checkOutDate: new Date(booking.checkOutDate),
       createdAt: new Date(booking.createdAt),
       updatedAt: booking.updatedAt ? new Date(booking.updatedAt) : undefined,
     };
 
-    // Migration for old data structure (pricePerNight to roomPrices)
     if (!parsed.roomPrices && parsed.pricePerNight) {
       parsed.roomPrices = parsed.roomNumbers.map((rn: number) => ({
         roomNumber: rn,
         price: parsed.pricePerNight,
       }));
-      // Recalculate totalAmount if it was based on old pricePerNight * numRooms
       const nights = calculateNights(parsed.checkInDate, parsed.checkOutDate);
       parsed.totalAmount = parsed.roomPrices.reduce((sum: number, rp: RoomPrice) => sum + (rp.price * nights), 0);
-      delete parsed.pricePerNight; // Remove old field
-    } else if (!parsed.roomPrices) { // Fallback if pricePerNight is also missing
-        parsed.roomPrices = parsed.roomNumbers.map((rn: number) => ({
-            roomNumber: rn,
-            price: DEFAULT_ROOM_PRICE_FALLBACK,
-        }));
+      delete parsed.pricePerNight; 
+    } else if (!parsed.roomPrices) { 
+        parsed.roomPrices = parsed.roomNumbers.map((rn: number) => {
+            const roomConfig = ROOM_CONFIG.find(rc => rc.id === rn);
+            return {
+                roomNumber: rn,
+                price: roomConfig ? roomConfig.defaultPrice : 1500, // Fallback default
+            };
+        });
         const nights = calculateNights(parsed.checkInDate, parsed.checkOutDate);
         parsed.totalAmount = parsed.roomPrices.reduce((sum: number, rp: RoomPrice) => sum + (rp.price * nights), 0);
     }
@@ -90,7 +89,7 @@ export function useBookings() {
       const data = await response.json();
       if (!Array.isArray(data)) {
         console.warn("Received non-array data from /api/bookings, falling back to client initial.");
-        setBookings(generateClientInitialBookings().map(parseBookingData)); // Parse fallback as well
+        setBookings(generateClientInitialBookings().map(parseBookingData)); 
         throw new Error("Invalid data format from server.");
       }
       setBookings(data.map(parseBookingData));
@@ -112,8 +111,7 @@ export function useBookings() {
     setError(null);
     try {
       const bookingsToSave = updatedBookings.map(booking => {
-        // Ensure dates are ISO strings, remove any client-specific objects if necessary
-        const { pricePerNight, ...bookingWithoutOldPrice } = booking as any; // Handle potential old field
+        const { pricePerNight, ...bookingWithoutOldPrice } = booking as any;
         return {
           ...bookingWithoutOldPrice,
           checkInDate: new Date(booking.checkInDate).toISOString(),

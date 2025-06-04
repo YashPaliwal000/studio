@@ -1,17 +1,22 @@
 
 'use client';
 import type { Booking, RoomPrice } from '@/lib/types';
-import { APP_NAME } from '@/lib/constants';
+import { APP_NAME, ROOM_CONFIG } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { format, differenceInDays } from 'date-fns';
-import { Printer, IndianRupee } from 'lucide-react';
+import { Printer } from 'lucide-react'; // Removed IndianRupee from here, will use char
 
 interface InvoiceDetailsProps {
   booking: Booking;
   appName: string;
 }
+
+const getRoomName = (roomId: number): string => {
+  const room = ROOM_CONFIG.find(r => r.id === roomId);
+  return room ? room.name : `Room ${roomId}`;
+};
 
 export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps) {
   const handlePrint = () => {
@@ -43,7 +48,7 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
           </div>
           <div className="sm:text-right">
             <h2 className="text-lg font-semibold text-foreground mb-2">Booking Details:</h2>
-            <p><strong>Rooms:</strong> {booking.roomNumbers.join(', ')}</p>
+            <p><strong>Rooms:</strong> {booking.roomNumbers.map(getRoomName).join(', ')}</p>
             <p><strong>Check-in:</strong> {format(new Date(booking.checkInDate), 'PPP')}</p>
             <p><strong>Check-out:</strong> {format(new Date(booking.checkOutDate), 'PPP')}</p>
             <p><strong>Guests:</strong> {booking.numberOfGuests}</p>
@@ -68,14 +73,14 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
                     {booking.roomPrices.map((roomPrice, index) => (
                       <tr key={index} className="border-b border-muted">
                         <td className="py-4 pl-4 pr-3 text-sm sm:pl-6">
-                          <p className="font-medium text-foreground">Room {roomPrice.roomNumber} ({nights} night{nights > 1 ? 's' : ''})</p>
+                          <p className="font-medium text-foreground">{getRoomName(roomPrice.roomNumber)} ({nights} night{nights > 1 ? 's' : ''})</p>
                           <p className="text-muted-foreground">{format(new Date(booking.checkInDate), 'MMM d')} - {format(new Date(booking.checkOutDate), 'MMM d, yyyy')}</p>
                         </td>
                         <td className="hidden px-3 py-4 text-right text-sm text-muted-foreground sm:table-cell">
-                          <span className="inline-flex items-center"><IndianRupee className="h-3.5 w-3.5 mr-0.5" />{roomPrice.price.toFixed(2)}</span>
+                          ₹{roomPrice.price.toFixed(2)}
                         </td>
                         <td className="py-4 pl-3 pr-4 text-right text-sm font-medium text-foreground sm:pr-6">
-                          <span className="inline-flex items-center"><IndianRupee className="h-3.5 w-3.5 mr-0.5" />{(roomPrice.price * nights).toFixed(2)}</span>
+                          ₹{(roomPrice.price * nights).toFixed(2)}
                         </td>
                       </tr>
                     ))}
@@ -89,7 +94,7 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
                         Total
                       </th>
                       <td className="pt-4 pl-3 pr-4 text-right text-sm font-semibold text-foreground sm:pr-6">
-                         <span className="inline-flex items-center"><IndianRupee className="h-4 w-4 mr-0.5" />{booking.totalAmount.toFixed(2)}</span>
+                         ₹{booking.totalAmount.toFixed(2)}
                       </td>
                     </tr>
                   </tfoot>

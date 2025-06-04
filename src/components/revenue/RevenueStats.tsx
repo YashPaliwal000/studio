@@ -1,8 +1,8 @@
 
 'use client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { Booking, RoomPrice } from '@/lib/types'; // Import RoomPrice
-import { MAX_ROOMS } from '@/lib/constants';
+import type { Booking, RoomPrice } from '@/lib/types'; 
+import { ROOM_CONFIG } from '@/lib/constants';
 import { IndianRupee, Percent, TrendingUp, Users } from 'lucide-react';
 import { useMemo } from 'react';
 import { differenceInDays, subDays, isWithinInterval, startOfDay, endOfDay, eachDayOfInterval } from 'date-fns';
@@ -22,7 +22,7 @@ export default function RevenueStats({ bookings }: RevenueStatsProps) {
     const periodStart = startOfDay(subDays(today, 29)); 
     const periodEnd = startOfDay(today); 
     const daysInPeriod = differenceInDays(periodEnd, periodStart) + 1;
-    const totalPossibleRoomNightsInPeriod = MAX_ROOMS * daysInPeriod;
+    const totalPossibleRoomNightsInPeriod = ROOM_CONFIG.length * daysInPeriod;
 
     let occupiedRoomNightsInPeriod = 0;
     const interval = { start: periodStart, end: periodEnd };
