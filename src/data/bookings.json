@@ -7,19 +7,20 @@
     "roomNumbers": [
       1
     ],
-    "checkInDate": "2025-06-05T11:47:14.032Z",
-    "checkOutDate": "2025-06-07T11:47:14.032Z",
+    "checkInDate": "2025-06-05T12:08:32.971Z",
+    "checkOutDate": "2025-06-07T12:08:32.971Z",
     "numberOfGuests": 2,
     "roomPrices": [
       {
         "roomNumber": 1,
-        "price": 150
+        "price": 3000
       }
     ],
+    "extraItems": [],
     "status": "Confirmed",
     "bookingSource": "Online",
-    "createdAt": "2025-06-04T11:47:14.032Z",
-    "totalAmount": 300
+    "createdAt": "2025-06-04T12:08:32.971Z",
+    "totalAmount": 6000
   },
   {
     "id": "init-bob-builder",
@@ -29,23 +30,32 @@
       2,
       3
     ],
-    "checkInDate": "2025-06-06T11:47:14.032Z",
-    "checkOutDate": "2025-06-09T11:47:14.032Z",
+    "checkInDate": "2025-06-06T12:08:32.971Z",
+    "checkOutDate": "2025-06-09T12:08:32.971Z",
     "numberOfGuests": 3,
     "roomPrices": [
       {
         "roomNumber": 2,
-        "price": 120
+        "price": 3000
       },
       {
         "roomNumber": 3,
-        "price": 130
+        "price": 3500
+      }
+    ],
+    "extraItems": [
+      {
+        "id": "some-unique-id-for-bob-item",
+        "name": "Extra Breakfast",
+        "price": 250,
+        "quantity": 2,
+        "unit": "plate"
       }
     ],
     "status": "Confirmed",
     "bookingSource": "Phone",
-    "createdAt": "2025-06-04T11:47:14.032Z",
-    "totalAmount": 750
+    "createdAt": "2025-06-04T12:08:32.971Z",
+    "totalAmount": 20000
   },
   {
     "guestName": "Yash",
@@ -64,6 +74,7 @@
         "price": 1500
       }
     ],
+    "extraItems": [],
     "totalAmount": 3000,
     "id": "SROQwU15Bbleo2Q0F-TDp",
     "createdAt": "2025-06-03T10:52:31.958Z"
@@ -91,7 +102,16 @@
         "price": 3000
       }
     ],
-    "totalAmount": 12000,
+    "extraItems": [
+      {
+        "id": "some-unique-id-extra-1",
+        "name": "Lunch",
+        "price": 300,
+        "quantity": 2,
+        "unit": "Thali"
+      }
+    ],
+    "totalAmount": 12600,
     "id": "1EmRRVcJdLJsdXvuHlWQ_",
     "createdAt": "2025-06-04T07:41:25.000Z"
   }

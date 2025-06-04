@@ -7,6 +7,14 @@ export interface RoomPrice {
   price: number;
 }
 
+export interface ExtraItem {
+  id: string; // For react-hook-form field array key
+  name: string;
+  price: number;
+  quantity: number;
+  unit: string;
+}
+
 export interface Booking {
   id: string;
   guestName: string;
@@ -15,7 +23,8 @@ export interface Booking {
   checkInDate: Date;
   checkOutDate: Date;
   numberOfGuests: number;
-  roomPrices: RoomPrice[]; // Changed from pricePerNight
+  roomPrices: RoomPrice[];
+  extraItems?: ExtraItem[]; // Added
   totalAmount: number;
   status: BookingStatus;
   bookingSource?: BookingSource;

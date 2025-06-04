@@ -1,14 +1,13 @@
 
 'use client';
-import type { Booking, RoomPrice } from '@/lib/types';
+import type { Booking, RoomPrice, ExtraItem } from '@/lib/types';
 import { APP_NAME, ROOM_CONFIG } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { format, differenceInDays } from 'date-fns';
-import { Printer } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Terminal } from "lucide-react"
+import { Printer, Terminal } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
 interface InvoiceDetailsProps {
@@ -16,7 +15,6 @@ interface InvoiceDetailsProps {
   appName: string;
 }
 
-// WhatsApp Icon SVG
 const WhatsAppIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -44,7 +42,7 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
   const nights = differenceInDays(new Date(booking.checkOutDate), new Date(booking.checkInDate)) || 1;
 
   const handleShareOnWhatsApp = () => {
-    const invoiceLink = typeof window !== 'undefined' ? window.location.href : ''; // Get current page URL
+    const invoiceLink = typeof window !== 'undefined' ? window.location.href : ''; 
     
     let message = `Invoice for ${booking.guestName} from ${appName}:\n\n`;
     message += `Booking ID: INV-${booking.id.substring(0, 8).toUpperCase()}\n`;
@@ -52,6 +50,12 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
     message += `Check-out: ${format(new Date(booking.checkOutDate), 'PPP')}\n`;
     message += `Nights: ${nights}\n`;
     message += `Rooms: ${booking.roomNumbers.map(getRoomName).join(', ')}\n`;
+    if (booking.extraItems && booking.extraItems.length > 0) {
+        message += `Extra Items:\n`;
+        booking.extraItems.forEach(item => {
+            message += `  - ${item.name} (Qty: ${item.quantity}, Price: Rs.${(item.price * item.quantity).toFixed(2)})\n`;
+        });
+    }
     message += `Total Amount: Rs. ${booking.totalAmount.toFixed(2)}\n\n`;
     message += `View details: ${invoiceLink}\n\n`;
     message += `(Please find the PDF invoice attached if saved, or use the link above to view.)`;
@@ -59,6 +63,10 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
+
+  const totalExtraItemsCost = booking.extraItems?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0;
+  const totalRoomCost = booking.totalAmount - totalExtraItemsCost;
+
 
   return (
     <Card className="max-w-3xl mx-auto shadow-xl print:shadow-none print:border-none">
@@ -100,29 +108,53 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
                   <thead>
                     <tr className="border-b border-muted">
                       <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-foreground sm:pl-6">Description</th>
-                      <th scope="col" className="hidden px-3 py-3.5 text-right text-sm font-semibold text-foreground sm:table-cell">Price/Night (Rs.)</th>
+                      <th scope="col" className="hidden px-3 py-3.5 text-right text-sm font-semibold text-foreground sm:table-cell">Rate (Rs.)</th>
+                      <th scope="col" className="hidden px-3 py-3.5 text-right text-sm font-semibold text-foreground sm:table-cell">Qty/Nights</th>
                       <th scope="col" className="py-3.5 pl-3 pr-4 text-right text-sm font-semibold text-foreground sm:pr-6">Amount (Rs.)</th>
                     </tr>
                   </thead>
                   <tbody>
                     {booking.roomPrices.map((roomPrice, index) => (
-                      <tr key={index} className="border-b border-muted">
+                      <tr key={`room-${index}`} className="border-b border-muted">
                         <td className="py-4 pl-4 pr-3 text-sm sm:pl-6">
-                          <p className="font-medium text-foreground">{getRoomName(roomPrice.roomNumber)} ({nights} night{nights > 1 ? 's' : ''})</p>
+                          <p className="font-medium text-foreground">{getRoomName(roomPrice.roomNumber)}</p>
                           <p className="text-muted-foreground">{format(new Date(booking.checkInDate), 'MMM d')} - {format(new Date(booking.checkOutDate), 'MMM d, yyyy')}</p>
                         </td>
                         <td className="hidden px-3 py-4 text-right text-sm text-muted-foreground sm:table-cell">
                           {roomPrice.price.toFixed(2)}
+                        </td>
+                        <td className="hidden px-3 py-4 text-right text-sm text-muted-foreground sm:table-cell">
+                          {nights} night{nights > 1 ? 's' : ''}
                         </td>
                         <td className="py-4 pl-3 pr-4 text-right text-sm font-medium text-foreground sm:pr-6">
                           {(roomPrice.price * nights).toFixed(2)}
                         </td>
                       </tr>
                     ))}
+                    {booking.extraItems && booking.extraItems.length > 0 && (
+                         <tr><td colSpan={4} className="pt-2 pb-1 pl-4 sm:pl-6"><p className="text-sm font-medium text-muted-foreground">Extra Items:</p></td></tr>
+                    )}
+                    {booking.extraItems?.map((item, index) => (
+                      <tr key={`extra-${index}`} className="border-b border-muted">
+                        <td className="py-2 pl-4 pr-3 text-sm sm:pl-6">
+                          <p className="font-medium text-foreground">{item.name}</p>
+                           <p className="text-muted-foreground text-xs">({item.unit})</p>
+                        </td>
+                        <td className="hidden px-3 py-2 text-right text-sm text-muted-foreground sm:table-cell">
+                          {item.price.toFixed(2)}
+                        </td>
+                        <td className="hidden px-3 py-2 text-right text-sm text-muted-foreground sm:table-cell">
+                          {item.quantity}
+                        </td>
+                        <td className="py-2 pl-3 pr-4 text-right text-sm font-medium text-foreground sm:pr-6">
+                          {(item.price * item.quantity).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                   <tfoot>
                     <tr>
-                      <th scope="row" colSpan={2} className="hidden pt-4 pl-6 pr-3 text-right text-sm font-semibold text-foreground sm:table-cell sm:pl-0">
+                      <th scope="row" colSpan={3} className="hidden pt-4 pl-6 pr-3 text-right text-sm font-semibold text-foreground sm:table-cell sm:pl-0">
                         Total
                       </th>
                       <th scope="row" className="pt-4 pl-4 pr-3 text-left text-sm font-semibold text-foreground sm:hidden">

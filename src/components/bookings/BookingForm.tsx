@@ -26,19 +26,30 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import type { Booking, BookingStatus, BookingSource, RoomPrice } from '@/lib/types';
+import type { Booking, BookingStatus, BookingSource, RoomPrice, ExtraItem } from '@/lib/types';
 import { ROOM_CONFIG, BOOKING_STATUSES, BOOKING_SOURCES } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
-import { InfoIcon } from 'lucide-react';
+import { InfoIcon, PlusCircle, Trash2 } from 'lucide-react';
 import { useBookings } from '@/hooks/useBookings';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { nanoid } from 'nanoid';
+import { Separator } from '../ui/separator';
+
 
 const roomPriceDetailSchema = z.object({
   roomNumber: z.number(), // This refers to room ID
   price: z.coerce.number().positive({ message: 'Price for each room must be positive.' }),
+});
+
+const extraItemSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1, { message: "Item name is required."}),
+  price: z.coerce.number().min(0, { message: "Item price cannot be negative."}),
+  quantity: z.coerce.number().min(1, { message: "Item quantity must be at least 1."}),
+  unit: z.string().min(1, { message: "Item unit is required (e.g., 'piece', 'plate')."}),
 });
 
 const bookingFormSchema = z.object({
@@ -49,6 +60,7 @@ const bookingFormSchema = z.object({
   checkOutDate: z.date({ required_error: 'Check-out date is required.' }),
   numberOfGuests: z.coerce.number().min(1, { message: 'At least one guest is required.' }),
   roomPriceDetails: z.array(roomPriceDetailSchema).min(1, { message: 'Price for selected rooms must be provided.' }),
+  extraItems: z.array(extraItemSchema).optional(),
   status: z.enum(BOOKING_STATUSES),
   bookingSource: z.enum(BOOKING_SOURCES).optional(),
   notes: z.string().optional(),
@@ -68,7 +80,7 @@ const bookingFormSchema = z.object({
 export type BookingFormValues = z.infer<typeof bookingFormSchema>;
 
 interface BookingFormProps {
-  initialData?: Partial<BookingFormValues & { checkInDate: Date, checkOutDate: Date, roomPrices?: RoomPrice[], id?: string }>;
+  initialData?: Partial<BookingFormValues & { checkInDate: Date, checkOutDate: Date, roomPrices?: RoomPrice[], id?: string, extraItems?: ExtraItem[] }>;
   onSubmit: (data: BookingFormValues) => Promise<any>;
   isEditMode?: boolean;
   currentBookingId?: string;
@@ -81,7 +93,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
 
   const getDefaultPriceForRoom = (roomId: number) => {
     const room = ROOM_CONFIG.find(r => r.id === roomId);
-    return room ? room.defaultPrice : 1500; // Fallback, though should always find
+    return room ? room.defaultPrice : 1500;
   };
 
   const form = useForm<BookingFormValues>({
@@ -93,20 +105,27 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
         roomNumbers: initialData.roomNumbers || [],
         roomPriceDetails: initialData.roomPrices?.map(rp => ({ roomNumber: rp.roomNumber, price: rp.price })) ||
                           initialData.roomNumbers?.map(rn => ({ roomNumber: rn, price: getDefaultPriceForRoom(rn) })) || [],
+        extraItems: initialData.extraItems?.map(ei => ({ ...ei, id: ei.id || nanoid() })) || [],
       } : {
       guestName: '',
       guestContact: '',
       roomNumbers: [],
       numberOfGuests: 1,
       roomPriceDetails: [],
+      extraItems: [],
       status: 'Confirmed',
       notes: '',
     },
   });
 
-  const { fields: roomPriceFields, append, remove, update } = useFieldArray({
+  const { fields: roomPriceFields, append: appendRoomPrice, remove: removeRoomPrice } = useFieldArray({
     control: form.control,
     name: "roomPriceDetails",
+  });
+
+  const { fields: extraItemFields, append: appendExtraItem, remove: removeExtraItem } = useFieldArray({
+    control: form.control,
+    name: "extraItems",
   });
 
   const selectedRoomNumbersInForm = form.watch('roomNumbers');
@@ -155,7 +174,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
 
     newSelectedRoomNumbersSet.forEach(rn => {
       if (!currentRoomPriceNumbers.has(rn)) {
-        append({ roomNumber: rn, price: getDefaultPriceForRoom(rn) });
+        appendRoomPrice({ roomNumber: rn, price: getDefaultPriceForRoom(rn) });
       }
     });
 
@@ -166,9 +185,9 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
       }
     });
     for (let i = indicesToRemove.length - 1; i >= 0; i--) {
-      remove(indicesToRemove[i]);
+      removeRoomPrice(indicesToRemove[i]);
     }
-  }, [selectedRoomNumbersInForm, roomPriceFields, append, remove]);
+  }, [selectedRoomNumbersInForm, roomPriceFields, appendRoomPrice, removeRoomPrice]);
 
 
   async function handleSubmit(data: BookingFormValues) {
@@ -371,7 +390,93 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                 )}
               />
             </div>
+
+            <Separator />
             
+            <div>
+                <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-lg font-medium">Extra Billable Items</h3>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => appendExtraItem({ id: nanoid(), name: '', price: 0, quantity: 1, unit: 'piece' })}
+                    >
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add Item
+                    </Button>
+                </div>
+                {extraItemFields.length === 0 && <p className="text-sm text-muted-foreground">No extra items added.</p>}
+                <div className="space-y-4">
+                {extraItemFields.map((item, index) => (
+                    <div key={item.id} className="p-4 border rounded-md space-y-3 bg-muted/20">
+                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
+                            <FormField
+                                control={form.control}
+                                name={`extraItems.${index}.name`}
+                                render={({ field }) => (
+                                    <FormItem>
+                                    <FormLabel>Item Name</FormLabel>
+                                    <FormControl><Input placeholder="e.g., Tea" {...field} /></FormControl>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name={`extraItems.${index}.quantity`}
+                                render={({ field }) => (
+                                    <FormItem>
+                                    <FormLabel>Quantity</FormLabel>
+                                    <FormControl><Input type="number" placeholder="e.g., 2" {...field} /></FormControl>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                             <FormField
+                                control={form.control}
+                                name={`extraItems.${index}.unit`}
+                                render={({ field }) => (
+                                    <FormItem>
+                                    <FormLabel>Unit</FormLabel>
+                                    <FormControl><Input placeholder="e.g., plate, piece" {...field} /></FormControl>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name={`extraItems.${index}.price`}
+                                render={({ field }) => (
+                                    <FormItem>
+                                    <FormLabel>Price (per unit)</FormLabel>
+                                     <FormControl>
+                                        <div className="relative w-full">
+                                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">Rs.</span>
+                                            <Input type="number" placeholder="e.g., 50" {...field} className="pl-10" />
+                                        </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => removeExtraItem(index)}
+                            className="mt-2"
+                        >
+                            <Trash2 className="mr-1 h-4 w-4" /> Remove Item
+                        </Button>
+                    </div>
+                ))}
+                </div>
+                <FormMessage>{form.formState.errors.extraItems?.message || form.formState.errors.extraItems?.root?.message}</FormMessage>
+            </div>
+            
+            <Separator />
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}

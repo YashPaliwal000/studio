@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { Booking } from '@/lib/types';
 import { ROOM_CONFIG } from '@/lib/constants';
-import { Edit, Trash2, User, Phone, CalendarDays, BedDouble, Users, CheckCircle, Info, PackageOpen, FileText } from 'lucide-react';
+import { Edit, Trash2, User, Phone, CalendarDays, BedDouble, Users, CheckCircle, Info, PackageOpen, FileText, ShoppingBag } from 'lucide-react';
 
 interface BookingCardProps {
   booking: Booking;
@@ -29,11 +29,12 @@ const getRoomNames = (roomIds: number[]): string => {
 };
 
 export default function BookingCard({ booking, onDelete }: BookingCardProps) {
-  const averagePricePerNight = booking.roomPrices.length > 0
+  const averagePricePerNightPerRoom = booking.roomPrices.length > 0
     ? booking.roomPrices.reduce((sum, rp) => sum + rp.price, 0) / booking.roomPrices.length
     : 0;
   
   const roomNames = getRoomNames(booking.roomNumbers);
+  const hasExtraItems = booking.extraItems && booking.extraItems.length > 0;
 
   return (
     <Card className="shadow-lg hover:shadow-xl transition-shadow w-full flex flex-col">
@@ -52,10 +53,11 @@ export default function BookingCard({ booking, onDelete }: BookingCardProps) {
         <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Check-in: {format(new Date(booking.checkInDate), 'PPP')}</div>
         <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Check-out: {format(new Date(booking.checkOutDate), 'PPP')}</div>
         <div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /> Guests: {booking.numberOfGuests}</div>
-        <div className="flex items-center gap-2">
-          {booking.roomPrices.length > 1 ? `Avg. Rs. ${averagePricePerNight.toFixed(2)}/night | ` : (booking.roomPrices[0] ? `Price Rs. ${booking.roomPrices[0].price.toFixed(2)}/night | ` : '')}
+        <div className="flex items-center gap-1">
+          {booking.roomPrices.length > 1 ? `Avg. Rs. ${averagePricePerNightPerRoom.toFixed(2)}/room/night | ` : (booking.roomPrices[0] ? `Price Rs. ${booking.roomPrices[0].price.toFixed(2)}/night | ` : '')}
           Total: Rs. {booking.totalAmount.toFixed(2)}
         </div>
+        {hasExtraItems && <div className="flex items-center gap-2 text-xs text-accent-foreground/80"><ShoppingBag className="h-3 w-3 text-accent" /> Includes extra items</div>}
         {booking.bookingSource && <div className="flex items-center gap-2"><PackageOpen className="h-4 w-4 text-muted-foreground" /> Source: {booking.bookingSource}</div>}
         {booking.notes && <div className="flex items-start gap-2"><Info className="h-4 w-4 text-muted-foreground mt-1" /> Notes: <span className="italic">{booking.notes}</span></div>}
       </CardContent>
@@ -77,4 +79,3 @@ export default function BookingCard({ booking, onDelete }: BookingCardProps) {
     </Card>
   );
 }
-

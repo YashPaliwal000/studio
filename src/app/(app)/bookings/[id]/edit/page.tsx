@@ -5,37 +5,39 @@ import type { BookingFormValues } from '@/components/bookings/BookingForm';
 import { useBookings } from '@/hooks/useBookings';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import type { Booking, RoomPrice } from '@/lib/types';
+import type { Booking, RoomPrice, ExtraItem } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { differenceInDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { nanoid } from 'nanoid';
 
 export default function EditBookingPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { getBookingById, updateBooking, bookings: allBookings, loading: bookingsLoadingHook } = useBookings();
-  const [initialDataForForm, setInitialDataForForm] = useState<Partial<BookingFormValues & { id?: string; roomPrices?: RoomPrice[] } > | undefined>(undefined);
+  const [initialDataForForm, setInitialDataForForm] = useState<Partial<BookingFormValues & { id?: string; roomPrices?: RoomPrice[], extraItems?: ExtraItem[] } > | undefined>(undefined);
   const [loadingPage, setLoadingPage] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (bookingsLoadingHook) return; // Wait for all bookings to load
+    if (bookingsLoadingHook) return; 
 
     if (id) {
       const booking = getBookingById(id as string);
       if (booking) {
         const { totalAmount, createdAt, updatedAt, ...formData } = booking;
-         const formValues: Partial<BookingFormValues & { id: string; roomPrices?: RoomPrice[] }> = {
+         const formValues: Partial<BookingFormValues & { id: string; roomPrices?: RoomPrice[]; extraItems?: ExtraItem[] }> = {
           ...formData,
-          id: booking.id, // Pass ID for conflict checking in BookingForm
+          id: booking.id, 
           roomNumbers: booking.roomNumbers,
           checkInDate: new Date(booking.checkInDate),
           checkOutDate: new Date(booking.checkOutDate),
           roomPriceDetails: booking.roomPrices.map(rp => ({ roomNumber: rp.roomNumber, price: rp.price })),
-          roomPrices: booking.roomPrices, 
+          extraItems: booking.extraItems?.map(ei => ({ ...ei, id: ei.id || nanoid() })) || [],
+          roomPrices: booking.roomPrices, // keep original roomPrices for BookingForm initialData
         };
         setInitialDataForForm(formValues);
       } else {
@@ -51,10 +53,9 @@ export default function EditBookingPage() {
     const checkIn = new Date(data.checkInDate);
     const checkOut = new Date(data.checkOutDate);
 
-    // Final conflict check before submission
     for (const roomNum of data.roomNumbers) {
       for (const existingBooking of allBookings) {
-        if (existingBooking.id === id) continue; // Skip self
+        if (existingBooking.id === id) continue; 
         if (existingBooking.status === 'Cancelled') continue;
         if (!existingBooking.roomNumbers.includes(roomNum)) continue;
 
@@ -67,7 +68,7 @@ export default function EditBookingPage() {
             description: `Room ${roomNum} is already booked for the selected dates. Please choose different rooms or dates.`,
             variant: 'destructive',
           });
-          return Promise.reject(new Error('Booking conflict')); // Reject promise
+          return Promise.reject(new Error('Booking conflict')); 
         }
       }
     }
@@ -82,9 +83,23 @@ export default function EditBookingPage() {
       price: rpd.price,
     }));
     
-    const totalAmount = roomPrices.reduce((sum, room) => {
+    const totalRoomAmount = roomPrices.reduce((sum, room) => {
       return sum + (room.price * nights);
     }, 0);
+
+    const extraItemsToSave: ExtraItem[] = (data.extraItems || []).map(item => ({
+        id: item.id || nanoid(),
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        unit: item.unit,
+    }));
+
+    const totalExtraItemsAmount = extraItemsToSave.reduce((sum, item) => {
+        return sum + (item.price * item.quantity);
+    }, 0);
+    
+    const totalAmount = totalRoomAmount + totalExtraItemsAmount;
 
     const bookingDataToUpdate: Partial<Omit<Booking, 'id' | 'createdAt'>> = {
         guestName: data.guestName,
@@ -94,6 +109,7 @@ export default function EditBookingPage() {
         checkOutDate: checkOut,
         numberOfGuests: data.numberOfGuests,
         roomPrices: roomPrices,
+        extraItems: extraItemsToSave,
         totalAmount: totalAmount,
         status: data.status,
         bookingSource: data.bookingSource,
@@ -109,7 +125,7 @@ export default function EditBookingPage() {
           <Skeleton className="h-8 w-1/2" />
         </CardHeader>
         <CardContent className="space-y-6">
-          {[...Array(8)].map((_, i) => ( 
+          {[...Array(10)].map((_, i) => ( 
             <div key={i} className="space-y-2">
               <Skeleton className="h-4 w-1/4" />
               <Skeleton className="h-10 w-full" />

@@ -3,9 +3,10 @@
 import BookingForm from '@/components/bookings/BookingForm';
 import type { BookingFormValues } from '@/components/bookings/BookingForm';
 import { useBookings } from '@/hooks/useBookings';
-import type { Booking, RoomPrice } from '@/lib/types';
+import type { Booking, RoomPrice, ExtraItem } from '@/lib/types';
 import { differenceInDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { nanoid } from 'nanoid';
 
 export default function AddBookingPage() {
   const { addBooking, bookings: allBookings, loading: bookingsLoading } = useBookings();
@@ -15,7 +16,6 @@ export default function AddBookingPage() {
     const checkIn = new Date(data.checkInDate);
     const checkOut = new Date(data.checkOutDate);
     
-    // Final conflict check before submission
     for (const roomNum of data.roomNumbers) {
       for (const existingBooking of allBookings) {
         if (existingBooking.status === 'Cancelled') continue;
@@ -30,7 +30,7 @@ export default function AddBookingPage() {
             description: `Room ${roomNum} is already booked for the selected dates. Please choose different rooms or dates.`,
             variant: 'destructive',
           });
-          return Promise.reject(new Error('Booking conflict')); // Reject promise to indicate failure
+          return Promise.reject(new Error('Booking conflict')); 
         }
       }
     }
@@ -45,9 +45,23 @@ export default function AddBookingPage() {
       price: rpd.price,
     }));
 
-    const totalAmount = roomPrices.reduce((sum, room) => {
+    const totalRoomAmount = roomPrices.reduce((sum, room) => {
       return sum + (room.price * nights);
     }, 0);
+
+    const extraItemsToSave: ExtraItem[] = (data.extraItems || []).map(item => ({
+      id: item.id || nanoid(), // Ensure ID for items that might not have one from form
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity,
+      unit: item.unit,
+    }));
+
+    const totalExtraItemsAmount = extraItemsToSave.reduce((sum, item) => {
+        return sum + (item.price * item.quantity);
+    }, 0);
+
+    const totalAmount = totalRoomAmount + totalExtraItemsAmount;
 
     const bookingDataToSave: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'> = {
       guestName: data.guestName,
@@ -57,6 +71,7 @@ export default function AddBookingPage() {
       checkOutDate: checkOut,
       numberOfGuests: data.numberOfGuests,
       roomPrices: roomPrices,
+      extraItems: extraItemsToSave,
       totalAmount: totalAmount,
       status: data.status,
       bookingSource: data.bookingSource,

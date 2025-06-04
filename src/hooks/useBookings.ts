@@ -1,7 +1,7 @@
 
 'use client';
 import { useState, useCallback, useEffect } from 'react';
-import type { Booking, BookingStatus, BookingSource, RoomPrice } from '@/lib/types';
+import type { Booking, BookingStatus, BookingSource, RoomPrice, ExtraItem } from '@/lib/types';
 import { ROOM_CONFIG } from '@/lib/constants';
 import { nanoid } from 'nanoid';
 import { differenceInDays } from 'date-fns';
@@ -23,6 +23,7 @@ const generateClientInitialBookings = (): Booking[] => {
       checkOutDate: new Date(new Date(today).setDate(today.getDate() + 7)),
       numberOfGuests: 2,
       roomPrices: [{ roomNumber: ROOM_CONFIG[0].id, price: ROOM_CONFIG[0].defaultPrice }],
+      extraItems: [] as ExtraItem[],
       status: 'Confirmed' as BookingStatus,
       bookingSource: 'Online' as BookingSource,
       createdAt: new Date(),
@@ -30,10 +31,11 @@ const generateClientInitialBookings = (): Booking[] => {
   ];
   return initialDataRaw.map(b => {
     const nights = calculateNights(b.checkInDate, b.checkOutDate);
-    const totalAmount = b.roomPrices.reduce((sum, rp) => sum + (rp.price * nights), 0);
+    const roomTotal = b.roomPrices.reduce((sum, rp) => sum + (rp.price * nights), 0);
+    const extraItemsTotal = b.extraItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     return {
       ...b,
-      totalAmount,
+      totalAmount: roomTotal + extraItemsTotal,
     };
   });
 };
@@ -52,27 +54,31 @@ export function useBookings() {
       checkOutDate: new Date(booking.checkOutDate),
       createdAt: new Date(booking.createdAt),
       updatedAt: booking.updatedAt ? new Date(booking.updatedAt) : undefined,
+      extraItems: Array.isArray(booking.extraItems) ? booking.extraItems.map((ei: any) => ({...ei, id: ei.id || nanoid()})) : [],
     };
 
-    if (!parsed.roomPrices && parsed.pricePerNight) {
+    const nights = calculateNights(parsed.checkInDate, parsed.checkOutDate);
+
+    if (!parsed.roomPrices && parsed.pricePerNight) { // Legacy: pricePerNight
       parsed.roomPrices = parsed.roomNumbers.map((rn: number) => ({
         roomNumber: rn,
         price: parsed.pricePerNight,
       }));
-      const nights = calculateNights(parsed.checkInDate, parsed.checkOutDate);
-      parsed.totalAmount = parsed.roomPrices.reduce((sum: number, rp: RoomPrice) => sum + (rp.price * nights), 0);
       delete parsed.pricePerNight; 
     } else if (!parsed.roomPrices) { 
         parsed.roomPrices = parsed.roomNumbers.map((rn: number) => {
             const roomConfig = ROOM_CONFIG.find(rc => rc.id === rn);
             return {
                 roomNumber: rn,
-                price: roomConfig ? roomConfig.defaultPrice : 1500, // Fallback default
+                price: roomConfig ? roomConfig.defaultPrice : 1500, 
             };
         });
-        const nights = calculateNights(parsed.checkInDate, parsed.checkOutDate);
-        parsed.totalAmount = parsed.roomPrices.reduce((sum: number, rp: RoomPrice) => sum + (rp.price * nights), 0);
     }
+    
+    // Recalculate totalAmount based on parsed roomPrices and extraItems
+    const roomTotal = parsed.roomPrices.reduce((sum: number, rp: RoomPrice) => sum + (rp.price * nights), 0);
+    const extraItemsTotal = parsed.extraItems.reduce((sum: number, item: ExtraItem) => sum + (item.price * item.quantity), 0);
+    parsed.totalAmount = roomTotal + extraItemsTotal;
 
 
     return parsed;
@@ -111,13 +117,21 @@ export function useBookings() {
     setError(null);
     try {
       const bookingsToSave = updatedBookings.map(booking => {
-        const { pricePerNight, ...bookingWithoutOldPrice } = booking as any;
+        const { pricePerNight, ...bookingWithoutOldPrice } = booking as any; // remove legacy pricePerNight
+        
+        const nights = calculateNights(new Date(booking.checkInDate), new Date(booking.checkOutDate));
+        const roomTotal = booking.roomPrices.reduce((sum, rp) => sum + (rp.price * nights), 0);
+        const extraItemsTotal = (booking.extraItems || []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const calculatedTotalAmount = roomTotal + extraItemsTotal;
+
         return {
           ...bookingWithoutOldPrice,
           checkInDate: new Date(booking.checkInDate).toISOString(),
           checkOutDate: new Date(booking.checkOutDate).toISOString(),
           createdAt: new Date(booking.createdAt).toISOString(),
           updatedAt: booking.updatedAt ? new Date(booking.updatedAt).toISOString() : undefined,
+          extraItems: (booking.extraItems || []).map(ei => ({...ei, id: ei.id || nanoid()})), // Ensure IDs for items
+          totalAmount: calculatedTotalAmount, // Use recalculated total amount
         };
       });
 
@@ -130,10 +144,12 @@ export function useBookings() {
         const errorData = await response.json().catch(() => ({ message: 'Failed to save bookings' }));
         throw new Error(errorData.message || `Failed to save bookings: ${response.status}`);
       }
+      // Re-parse after saving to ensure consistency if API modifies data (though it shouldn't here)
       setBookings(updatedBookings.map(parseBookingData)); 
     } catch (e: any) {
       console.error("Error saving bookings:", e);
       setError(e.message || 'Failed to save bookings.');
+      // Optionally revert to previous state or refetch if save fails
       throw e; 
     } finally {
       setLoading(false); 
@@ -141,10 +157,17 @@ export function useBookings() {
   };
 
   const addBooking = useCallback(async (newBookingData: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const nights = calculateNights(new Date(newBookingData.checkInDate), new Date(newBookingData.checkOutDate));
+    const roomTotal = newBookingData.roomPrices.reduce((sum, rp) => sum + (rp.price * nights), 0);
+    const extraItemsTotal = (newBookingData.extraItems || []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const totalAmount = roomTotal + extraItemsTotal;
+
     const bookingWithId: Booking = {
       ...newBookingData,
       id: nanoid(),
       createdAt: new Date(),
+      extraItems: (newBookingData.extraItems || []).map(ei => ({...ei, id: ei.id || nanoid()})),
+      totalAmount: totalAmount,
     };
     const newBookingsArray = [...bookings, bookingWithId];
     await saveBookingsToApi(newBookingsArray);
@@ -153,9 +176,21 @@ export function useBookings() {
 
   const updateBooking = useCallback(async (id: string, updatedBookingData: Partial<Omit<Booking, 'id' | 'createdAt'>>) => {
     let updatedBooking: Booking | undefined;
+
+    const nights = calculateNights(new Date(updatedBookingData.checkInDate!), new Date(updatedBookingData.checkOutDate!));
+    const roomTotal = updatedBookingData.roomPrices!.reduce((sum, rp) => sum + (rp.price * nights), 0);
+    const extraItemsTotal = (updatedBookingData.extraItems || []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const totalAmount = roomTotal + extraItemsTotal;
+    
     const newBookingsArray = bookings.map((booking) => {
       if (booking.id === id) {
-        updatedBooking = { ...booking, ...updatedBookingData, updatedAt: new Date() };
+        updatedBooking = { 
+          ...booking, 
+          ...updatedBookingData, 
+          extraItems: (updatedBookingData.extraItems || []).map(ei => ({...ei, id: ei.id || nanoid()})),
+          totalAmount: totalAmount,
+          updatedAt: new Date() 
+        };
         return updatedBooking;
       }
       return booking;
