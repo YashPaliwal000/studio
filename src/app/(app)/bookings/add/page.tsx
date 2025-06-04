@@ -15,22 +15,19 @@ export default function AddBookingPage() {
     
     let nights = differenceInDays(checkOut, checkIn);
     if (nights <= 0) {
-      // This case should ideally be caught by form validation,
-      // but as a safeguard or if specific logic for min 1 night total is needed:
       nights = 1; 
     }
     
-    const totalAmount = data.pricePerNight * nights;
+    const numberOfSelectedRooms = data.roomNumbers.length;
+    const totalAmount = data.pricePerNight * nights * numberOfSelectedRooms;
 
     const bookingDataToSave: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'> = {
       ...data,
+      roomNumbers: data.roomNumbers, // Ensure this is passed
       checkInDate: checkIn,
       checkOutDate: checkOut,
       pricePerNight: data.pricePerNight,
       totalAmount: totalAmount,
-      // Ensure all other fields from Booking type are present if not optional
-      // guestName, guestContact, roomNumber, numberOfGuests, status are from 'data'
-      // bookingSource, notes are optional and also from 'data'
     };
     
     return addBooking(bookingDataToSave);
@@ -38,7 +35,6 @@ export default function AddBookingPage() {
 
   return (
     <div className="py-8">
-      {/* Default values for pricePerNight etc. are handled within BookingForm */}
       <BookingForm onSubmit={handleSubmit} />
     </div>
   );

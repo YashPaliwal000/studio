@@ -1,18 +1,15 @@
 
 'use client';
 import { useState, useCallback, useEffect } from 'react';
-import type { Booking, BookingStatus } from '@/lib/types';
+import type { Booking, BookingStatus, BookingSource } from '@/lib/types';
 import { nanoid } from 'nanoid';
 import { differenceInDays } from 'date-fns';
 
-// Helper to calculate number of nights (remains client-side for form logic etc.)
 const calculateNights = (checkIn: Date, checkOut: Date): number => {
   const nights = differenceInDays(new Date(checkOut), new Date(checkIn));
-  return nights > 0 ? nights : 0; // Or 1 if min 1 night policy
+  return nights > 0 ? nights : 1; // Ensure at least 1 night for calculation if dates are same or invalid
 };
 
-// Client-side initial bookings, used if API fails catastrophically or as a reference.
-// The server will manage its own initial set in data/bookings.json.
 const generateClientInitialBookings = (): Booking[] => {
   const today = new Date();
   const initialData = [
@@ -20,7 +17,7 @@ const generateClientInitialBookings = (): Booking[] => {
       id: nanoid(),
       guestName: 'Charlie Fallback',
       guestContact: 'charlie@example.com',
-      roomNumber: 3,
+      roomNumbers: [3], // Changed to roomNumbers
       checkInDate: new Date(new Date(today).setDate(today.getDate() + 5)),
       checkOutDate: new Date(new Date(today).setDate(today.getDate() + 7)),
       numberOfGuests: 2,
@@ -32,7 +29,7 @@ const generateClientInitialBookings = (): Booking[] => {
   ];
   return initialData.map(b => ({
     ...b,
-    totalAmount: b.pricePerNight * calculateNights(b.checkInDate, b.checkOutDate),
+    totalAmount: b.pricePerNight * calculateNights(b.checkInDate, b.checkOutDate) * b.roomNumbers.length,
   }));
 };
 
@@ -44,13 +41,14 @@ export function useBookings() {
 
   const parseBookingDates = (booking: any): Booking => ({
     ...booking,
+    // Ensure roomNumbers is an array, provide default if migrating from old roomNumber
+    roomNumbers: Array.isArray(booking.roomNumbers) ? booking.roomNumbers : (typeof booking.roomNumber === 'number' ? [booking.roomNumber] : [1]),
     checkInDate: new Date(booking.checkInDate),
     checkOutDate: new Date(booking.checkOutDate),
     createdAt: new Date(booking.createdAt),
     updatedAt: booking.updatedAt ? new Date(booking.updatedAt) : undefined,
   });
 
-  // Fetch bookings from API
   const fetchBookings = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -69,7 +67,7 @@ export function useBookings() {
     } catch (e: any) {
       console.error("Error fetching bookings:", e);
       setError(e.message || 'Failed to load bookings.');
-      setBookings(generateClientInitialBookings()); // Fallback
+      setBookings(generateClientInitialBookings()); 
     } finally {
       setLoading(false);
     }
@@ -79,27 +77,26 @@ export function useBookings() {
     fetchBookings();
   }, [fetchBookings]);
 
-  // Save all bookings to API
   const saveBookingsToApi = async (updatedBookings: Booking[]) => {
-    setLoading(true); // Or a more specific 'saving' state
+    setLoading(true); 
     setError(null);
     try {
       const response = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedBookings), // API expects array of all bookings
+        body: JSON.stringify(updatedBookings),
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Failed to save bookings' }));
         throw new Error(errorData.message || `Failed to save bookings: ${response.status}`);
       }
-      setBookings(updatedBookings.map(parseBookingDates)); // Update local state with what was saved
+      setBookings(updatedBookings.map(parseBookingDates)); 
     } catch (e: any) {
       console.error("Error saving bookings:", e);
       setError(e.message || 'Failed to save bookings.');
-      throw e; // Re-throw so caller can handle
+      throw e; 
     } finally {
-      setLoading(false); // Or clear 'saving' state
+      setLoading(false); 
     }
   };
 
@@ -111,8 +108,8 @@ export function useBookings() {
     };
     const newBookingsArray = [...bookings, bookingWithId];
     await saveBookingsToApi(newBookingsArray);
-    return bookingWithId; // Return the newly added booking
-  }, [bookings]); // Removed saveBookingsToApi from deps as it's stable if not memoized
+    return bookingWithId;
+  }, [bookings]);
 
   const updateBooking = useCallback(async (id: string, updatedBookingData: Partial<Omit<Booking, 'id' | 'createdAt'>>) => {
     let updatedBooking: Booking | undefined;

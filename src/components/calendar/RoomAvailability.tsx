@@ -1,3 +1,4 @@
+
 'use client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +16,7 @@ export default function RoomAvailability({ selectedDate, bookings }: RoomAvailab
   const getRoomStatus = (roomNumber: number) => {
     const bookingForRoom = bookings.find(
       (booking) =>
-        booking.roomNumber === roomNumber &&
+        booking.roomNumbers.includes(roomNumber) && // Check if this room is in the booking's roomNumbers array
         new Date(booking.checkInDate) <= selectedDate &&
         new Date(booking.checkOutDate) > selectedDate &&
         booking.status !== 'Cancelled'
@@ -27,7 +28,7 @@ export default function RoomAvailability({ selectedDate, bookings }: RoomAvailab
     new Date(booking.checkInDate) <= selectedDate &&
     new Date(booking.checkOutDate) > selectedDate &&
     booking.status !== 'Cancelled'
-  ).sort((a,b) => a.roomNumber - b.roomNumber);
+  ).sort((a,b) => (a.roomNumbers[0] || 0) - (b.roomNumbers[0] || 0)); // Sort by first room number
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
@@ -70,7 +71,7 @@ export default function RoomAvailability({ selectedDate, bookings }: RoomAvailab
             <ul className="space-y-3">
               {bookingsOnSelectedDate.map(booking => (
                 <li key={booking.id} className="p-3 rounded-md border">
-                  <p className="font-semibold text-primary">Room {booking.roomNumber}: {booking.guestName}</p>
+                  <p className="font-semibold text-primary">Rooms {booking.roomNumbers.join(', ')}: {booking.guestName}</p>
                   <p className="text-sm text-muted-foreground">
                     Check-in: {format(new Date(booking.checkInDate), 'p')}, Check-out: {format(new Date(booking.checkOutDate), 'PPP p')}
                   </p>

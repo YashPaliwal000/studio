@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import { format, isToday, parseISO } from 'date-fns';
@@ -21,7 +22,7 @@ export default function CheckInPage() {
       (booking) =>
         format(new Date(booking.checkInDate), 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd') &&
         (booking.status === 'Confirmed' || booking.status === 'CheckedIn')
-    ).sort((a,b) => a.roomNumber - b.roomNumber);
+    ).sort((a,b) => a.guestName.localeCompare(b.guestName)); // Sort by guest name
   }, [bookings, selectedDate]);
 
   const handleCheckIn = (id: string) => {

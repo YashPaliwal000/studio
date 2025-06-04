@@ -1,3 +1,4 @@
+
 'use client';
 import { format } from 'date-fns';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +26,7 @@ export default function CheckInItem({ booking, onCheckIn }: CheckInItemProps) {
             {booking.status}
           </Badge>
         </div>
-        <CardDescription>Room {booking.roomNumber}</CardDescription>
+        <CardDescription>Rooms: {booking.roomNumbers.join(', ')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-1 text-sm">
         <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /> {booking.guestContact}</div>

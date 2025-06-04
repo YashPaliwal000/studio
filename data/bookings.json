@@ -1,9 +1,12 @@
+
 [
   {
     "id": "init-alice-wonderland",
     "guestName": "Alice Wonderland",
     "guestContact": "alice@example.com",
-    "roomNumber": 1,
+    "roomNumbers": [
+      1
+    ],
     "checkInDate": "2025-06-04T10:52:20.486Z",
     "checkOutDate": "2025-06-06T10:52:20.486Z",
     "numberOfGuests": 2,
@@ -17,12 +20,15 @@
     "id": "init-bob-builder",
     "guestName": "Bob The Builder",
     "guestContact": "bob@example.com",
-    "roomNumber": 2,
+    "roomNumbers": [
+      2,
+      3
+    ],
     "checkInDate": "2025-06-05T10:52:20.486Z",
     "checkOutDate": "2025-06-08T10:52:20.486Z",
-    "numberOfGuests": 1,
+    "numberOfGuests": 3,
     "pricePerNight": 120,
-    "totalAmount": 360,
+    "totalAmount": 720,
     "status": "Confirmed",
     "bookingSource": "Phone",
     "createdAt": "2025-06-03T10:52:20.486Z"
@@ -30,7 +36,9 @@
   {
     "guestName": "Yash",
     "guestContact": "yahcapstan@gmail.com",
-    "roomNumber": 1,
+    "roomNumbers": [
+      1
+    ],
     "checkInDate": "2025-06-02T18:30:00.000Z",
     "checkOutDate": "2025-06-04T18:30:00.000Z",
     "numberOfGuests": 1,

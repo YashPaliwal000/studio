@@ -6,12 +6,12 @@ export interface Booking {
   id: string;
   guestName: string;
   guestContact: string;
-  roomNumber: number;
+  roomNumbers: number[]; // Changed from roomNumber: number
   checkInDate: Date;
   checkOutDate: Date;
   numberOfGuests: number;
-  pricePerNight: number; // New field
-  totalAmount: number; // Will be calculated: pricePerNight * numberOfNights
+  pricePerNight: number; 
+  totalAmount: number; 
   status: BookingStatus;
   bookingSource?: BookingSource;
   notes?: string;

@@ -35,7 +35,7 @@ export default function BookingCard({ booking, onDelete }: BookingCardProps) {
       </CardHeader>
       <CardContent className="space-y-3 text-sm flex-grow">
         <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /> Guest Contact: {booking.guestContact}</div>
-        <div className="flex items-center gap-2"><BedDouble className="h-4 w-4 text-muted-foreground" /> Room: {booking.roomNumber}</div>
+        <div className="flex items-center gap-2"><BedDouble className="h-4 w-4 text-muted-foreground" /> Rooms: {booking.roomNumbers.join(', ')}</div>
         <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Check-in: {format(new Date(booking.checkInDate), 'PPP')}</div>
         <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Check-out: {format(new Date(booking.checkOutDate), 'PPP')}</div>
         <div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /> Guests: {booking.numberOfGuests}</div>

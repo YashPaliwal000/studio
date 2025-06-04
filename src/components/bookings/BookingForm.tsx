@@ -15,6 +15,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -30,15 +31,14 @@ import { ROOM_NUMBERS, BOOKING_STATUSES, BOOKING_SOURCES } from '@/lib/constants
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
-// BookingFormValues will not include totalAmount, as it's calculated by parent
 const bookingFormSchema = z.object({
   guestName: z.string().min(2, { message: 'Guest name must be at least 2 characters.' }),
   guestContact: z.string().min(5, { message: 'Guest contact is required.' }),
-  roomNumber: z.coerce.number().min(1).max(ROOM_NUMBERS.length),
+  roomNumbers: z.array(z.coerce.number()).min(1, { message: 'At least one room must be selected.' }),
   checkInDate: z.date({ required_error: 'Check-in date is required.' }),
   checkOutDate: z.date({ required_error: 'Check-out date is required.' }),
   numberOfGuests: z.coerce.number().min(1, { message: 'At least one guest is required.' }),
-  pricePerNight: z.coerce.number().positive({ message: 'Price per night must be positive.' }),
+  pricePerNight: z.coerce.number().positive({ message: 'Price per night (per room) must be positive.' }),
   status: z.enum(BOOKING_STATUSES),
   bookingSource: z.enum(BOOKING_SOURCES).optional(),
   notes: z.string().optional(),
@@ -47,12 +47,11 @@ const bookingFormSchema = z.object({
   path: ["checkOutDate"],
 });
 
-// This type is for the form's own data
 export type BookingFormValues = z.infer<typeof bookingFormSchema>;
 
 interface BookingFormProps {
-  initialData?: Partial<BookingFormValues & { checkInDate: Date, checkOutDate: Date}>; // For edit mode, pass values according to form schema
-  onSubmit: (data: BookingFormValues) => Promise<any>; // Parent will handle calculating totalAmount
+  initialData?: Partial<BookingFormValues & { checkInDate: Date, checkOutDate: Date}>;
+  onSubmit: (data: BookingFormValues) => Promise<any>; 
   isEditMode?: boolean;
 }
 
@@ -64,15 +63,15 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false 
     resolver: zodResolver(bookingFormSchema),
     defaultValues: initialData ? {
         ...initialData,
-        // Ensure dates are Date objects if passed as strings from initialData source
         checkInDate: initialData.checkInDate ? new Date(initialData.checkInDate) : undefined,
         checkOutDate: initialData.checkOutDate ? new Date(initialData.checkOutDate) : undefined,
+        roomNumbers: initialData.roomNumbers || [],
       } : {
       guestName: '',
       guestContact: '',
-      roomNumber: ROOM_NUMBERS[0],
+      roomNumbers: [], 
       numberOfGuests: 1,
-      pricePerNight: 1500, // Default price per night
+      pricePerNight: 1500, 
       status: 'Confirmed',
       notes: '',
     },
@@ -80,7 +79,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false 
 
   async function handleSubmit(data: BookingFormValues) {
     try {
-      await onSubmit(data); // onSubmit prop now expects BookingFormValues
+      await onSubmit(data);
       toast({
         title: isEditMode ? 'Booking Updated' : 'Booking Created',
         description: `Booking for ${data.guestName} has been successfully ${isEditMode ? 'updated' : 'created'}.`,
@@ -129,45 +128,73 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false 
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="roomNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Room Number</FormLabel>
-                    <Select onValueChange={(value) => field.onChange(Number(value))} defaultValue={String(field.value)}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a room" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {ROOM_NUMBERS.map(roomNum => (
-                          <SelectItem key={roomNum} value={String(roomNum)}>
-                            Room {roomNum}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="numberOfGuests"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Number of Guests</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="e.g., 2" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            
+            <FormField
+              control={form.control}
+              name="roomNumbers"
+              render={() => (
+                <FormItem>
+                  <div className="mb-4">
+                    <FormLabel className="text-base">Select Rooms</FormLabel>
+                    <FormDescription>
+                      Choose one or more rooms for this booking.
+                    </FormDescription>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {ROOM_NUMBERS.map((roomNum) => (
+                    <FormField
+                      key={roomNum}
+                      control={form.control}
+                      name="roomNumbers"
+                      render={({ field }) => {
+                        return (
+                          <FormItem
+                            key={roomNum}
+                            className="flex flex-row items-start space-x-3 space-y-0 p-3 border rounded-md hover:bg-muted/50"
+                          >
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes(roomNum)}
+                                onCheckedChange={(checked) => {
+                                  return checked
+                                    ? field.onChange([...(field.value || []), roomNum])
+                                    : field.onChange(
+                                        (field.value || []).filter(
+                                          (value) => value !== roomNum
+                                        )
+                                      )
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Room {roomNum}
+                            </FormLabel>
+                          </FormItem>
+                        )
+                      }}
+                    />
+                  ))}
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="numberOfGuests"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Total Number of Guests</FormLabel>
+                  <FormControl>
+                    <Input type="number" placeholder="e.g., 2" {...field} />
+                  </FormControl>
+                  <FormDescription>Total guests across all selected rooms.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
@@ -202,7 +229,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false 
                 name="pricePerNight"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Price Per Night (₹)</FormLabel>
+                    <FormLabel>Price Per Night (Per Room, ₹)</FormLabel>
                     <FormControl>
                       <Input type="number" step="0.01" placeholder="e.g., 1500.00" {...field} />
                     </FormControl>

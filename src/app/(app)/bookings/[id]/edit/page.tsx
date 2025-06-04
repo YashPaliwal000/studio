@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import type { Booking } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button'; // Added import for Button
+import { Button } from '@/components/ui/button';
 import { differenceInDays } from 'date-fns';
 
 export default function EditBookingPage() {
@@ -23,13 +23,13 @@ export default function EditBookingPage() {
     if (id) {
       const booking = getBookingById(id as string);
       if (booking) {
-        // Map Booking to BookingFormValues
         const { totalAmount, createdAt, updatedAt, ...formData } = booking;
         setInitialDataForForm({
           ...formData,
-          checkInDate: new Date(booking.checkInDate), // ensure Date objects
-          checkOutDate: new Date(booking.checkOutDate), // ensure Date objects
-          pricePerNight: booking.pricePerNight, // This is now part of Booking type
+          roomNumbers: booking.roomNumbers, // Ensure this is passed as an array
+          checkInDate: new Date(booking.checkInDate),
+          checkOutDate: new Date(booking.checkOutDate),
+          pricePerNight: booking.pricePerNight,
         });
       } else {
         setError('Booking not found.');
@@ -46,13 +46,14 @@ export default function EditBookingPage() {
 
     let nights = differenceInDays(checkOut, checkIn);
      if (nights <= 0) {
-      nights = 1; // Or handle error, form validation should prevent this
+      nights = 1;
     }
-    const totalAmount = data.pricePerNight * nights;
+    const numberOfSelectedRooms = data.roomNumbers.length;
+    const totalAmount = data.pricePerNight * nights * numberOfSelectedRooms;
 
-    // Construct the data to be saved, including calculated totalAmount
     const bookingDataToUpdate: Partial<Omit<Booking, 'id' | 'createdAt'>> = {
-        ...data, // Spread all form values
+        ...data,
+        roomNumbers: data.roomNumbers,
         checkInDate: checkIn,
         checkOutDate: checkOut,
         pricePerNight: data.pricePerNight,
@@ -68,7 +69,7 @@ export default function EditBookingPage() {
           <Skeleton className="h-8 w-1/2" />
         </CardHeader>
         <CardContent className="space-y-6">
-          {[...Array(6)].map((_, i) => ( // Increased skeleton items for pricePerNight field
+          {[...Array(7)].map((_, i) => ( // Increased skeleton items for roomNumbers and pricePerNight
             <div key={i} className="space-y-2">
               <Skeleton className="h-4 w-1/4" />
               <Skeleton className="h-10 w-full" />
