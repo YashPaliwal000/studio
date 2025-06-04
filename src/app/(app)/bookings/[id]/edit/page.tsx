@@ -10,41 +10,67 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { differenceInDays } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 export default function EditBookingPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { getBookingById, updateBooking } = useBookings();
-  const [initialDataForForm, setInitialDataForForm] = useState<Partial<BookingFormValues & { roomPrices?: RoomPrice[] } > | undefined>(undefined);
-  const [loading, setLoading] = useState(true);
+  const { getBookingById, updateBooking, bookings: allBookings, loading: bookingsLoadingHook } = useBookings();
+  const [initialDataForForm, setInitialDataForForm] = useState<Partial<BookingFormValues & { id?: string; roomPrices?: RoomPrice[] } > | undefined>(undefined);
+  const [loadingPage, setLoadingPage] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
+    if (bookingsLoadingHook) return; // Wait for all bookings to load
+
     if (id) {
       const booking = getBookingById(id as string);
       if (booking) {
         const { totalAmount, createdAt, updatedAt, ...formData } = booking;
-         const formValues: Partial<BookingFormValues & { roomPrices?: RoomPrice[] }> = {
+         const formValues: Partial<BookingFormValues & { id: string; roomPrices?: RoomPrice[] }> = {
           ...formData,
+          id: booking.id, // Pass ID for conflict checking in BookingForm
           roomNumbers: booking.roomNumbers,
           checkInDate: new Date(booking.checkInDate),
           checkOutDate: new Date(booking.checkOutDate),
-          roomPriceDetails: booking.roomPrices.map(rp => ({ roomNumber: rp.roomNumber, price: rp.price })), // for the form
-          roomPrices: booking.roomPrices, // for initialData prop consistency
+          roomPriceDetails: booking.roomPrices.map(rp => ({ roomNumber: rp.roomNumber, price: rp.price })),
+          roomPrices: booking.roomPrices, 
         };
         setInitialDataForForm(formValues);
       } else {
         setError('Booking not found.');
       }
-      setLoading(false);
+      setLoadingPage(false);
     }
-  }, [id, getBookingById]);
+  }, [id, getBookingById, bookingsLoadingHook]);
 
   const handleSubmit = async (data: BookingFormValues) => {
-    if (!id) return;
+    if (!id) return Promise.reject(new Error('Booking ID is missing'));
 
     const checkIn = new Date(data.checkInDate);
     const checkOut = new Date(data.checkOutDate);
+
+    // Final conflict check before submission
+    for (const roomNum of data.roomNumbers) {
+      for (const existingBooking of allBookings) {
+        if (existingBooking.id === id) continue; // Skip self
+        if (existingBooking.status === 'Cancelled') continue;
+        if (!existingBooking.roomNumbers.includes(roomNum)) continue;
+
+        const existingCheckIn = new Date(existingBooking.checkInDate);
+        const existingCheckOut = new Date(existingBooking.checkOutDate);
+
+        if (checkIn < existingCheckOut && checkOut > existingCheckIn) {
+          toast({
+            title: 'Booking Conflict',
+            description: `Room ${roomNum} is already booked for the selected dates. Please choose different rooms or dates.`,
+            variant: 'destructive',
+          });
+          return Promise.reject(new Error('Booking conflict')); // Reject promise
+        }
+      }
+    }
 
     let nights = differenceInDays(checkOut, checkIn);
      if (nights <= 0) {
@@ -76,7 +102,7 @@ export default function EditBookingPage() {
     return updateBooking(id as string, bookingDataToUpdate);
   };
 
-  if (loading) {
+  if (loadingPage || bookingsLoadingHook) {
     return (
       <Card className="w-full max-w-2xl mx-auto">
         <CardHeader>
@@ -115,7 +141,12 @@ export default function EditBookingPage() {
 
   return (
     <div className="py-8">
-      <BookingForm initialData={initialDataForForm} onSubmit={handleSubmit} isEditMode={true} />
+      <BookingForm 
+        initialData={initialDataForForm} 
+        onSubmit={handleSubmit} 
+        isEditMode={true}
+        currentBookingId={id as string} 
+      />
     </div>
   );
 }

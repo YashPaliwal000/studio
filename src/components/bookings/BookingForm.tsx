@@ -30,8 +30,11 @@ import type { Booking, BookingStatus, BookingSource, RoomPrice } from '@/lib/typ
 import { ROOM_NUMBERS, BOOKING_STATUSES, BOOKING_SOURCES } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { IndianRupee } from 'lucide-react';
+import { useEffect, useMemo } from 'react';
+import { IndianRupee, InfoIcon } from 'lucide-react';
+import { useBookings } from '@/hooks/useBookings';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 const roomPriceDetailSchema = z.object({
   roomNumber: z.number(),
@@ -65,16 +68,18 @@ const bookingFormSchema = z.object({
 export type BookingFormValues = z.infer<typeof bookingFormSchema>;
 
 interface BookingFormProps {
-  initialData?: Partial<BookingFormValues & { checkInDate: Date, checkOutDate: Date, roomPrices?: RoomPrice[] }>;
+  initialData?: Partial<BookingFormValues & { checkInDate: Date, checkOutDate: Date, roomPrices?: RoomPrice[], id?: string }>;
   onSubmit: (data: BookingFormValues) => Promise<any>;
   isEditMode?: boolean;
+  currentBookingId?: string;
 }
 
 const DEFAULT_ROOM_PRICE = 1500;
 
-export default function BookingForm({ initialData, onSubmit, isEditMode = false }: BookingFormProps) {
+export default function BookingForm({ initialData, onSubmit, isEditMode = false, currentBookingId }: BookingFormProps) {
   const { toast } = useToast();
   const router = useRouter();
+  const { bookings: allBookings, loading: bookingsLoading } = useBookings();
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema),
@@ -96,42 +101,75 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false 
     },
   });
 
-  const { fields: roomPriceFields, append, remove, update } = useFieldArray({
+  const { fields: roomPriceFields, append, remove } = useFieldArray({
     control: form.control,
     name: "roomPriceDetails",
   });
 
-  const selectedRoomNumbers = form.watch('roomNumbers');
+  const selectedRoomNumbersInForm = form.watch('roomNumbers');
+  const checkInDate = form.watch('checkInDate');
+  const checkOutDate = form.watch('checkOutDate');
+
+  const conflictingRooms = useMemo(() => {
+    if (!checkInDate || !checkOutDate || bookingsLoading || !allBookings) return new Set<number>();
+    const conflicts = new Set<number>();
+
+    for (const booking of allBookings) {
+      if (currentBookingId && booking.id === currentBookingId) continue; // Skip self in edit mode
+      if (booking.status === 'Cancelled') continue;
+
+      const existingCheckIn = new Date(booking.checkInDate);
+      const existingCheckOut = new Date(booking.checkOutDate);
+
+      if (checkInDate < existingCheckOut && checkOutDate > existingCheckIn) {
+        booking.roomNumbers.forEach(rn => conflicts.add(rn));
+      }
+    }
+    return conflicts;
+  }, [allBookings, bookingsLoading, checkInDate, checkOutDate, currentBookingId]);
+
+
+  useEffect(() => {
+    if (bookingsLoading || !allBookings || !checkInDate || !checkOutDate) return;
+
+    const currentlySelectedRooms = form.getValues('roomNumbers') || [];
+    const stillAvailableSelectedRooms = currentlySelectedRooms.filter(roomNum => !conflictingRooms.has(roomNum));
+
+    if (stillAvailableSelectedRooms.length < currentlySelectedRooms.length) {
+      form.setValue('roomNumbers', stillAvailableSelectedRooms, { shouldValidate: true });
+      toast({
+          title: "Room Availability Update",
+          description: "Some selected rooms became unavailable for the chosen dates and were automatically deselected.",
+          variant: "default",
+      });
+    }
+  }, [conflictingRooms, allBookings, bookingsLoading, checkInDate, checkOutDate, form, toast]);
+
 
   useEffect(() => {
     const currentRoomPriceNumbers = new Set(roomPriceFields.map(f => f.roomNumber));
-    const newSelectedRoomNumbers = new Set(selectedRoomNumbers);
+    const newSelectedRoomNumbersSet = new Set(selectedRoomNumbersInForm);
 
-    // Add new fields for newly selected rooms
-    newSelectedRoomNumbers.forEach(rn => {
+    newSelectedRoomNumbersSet.forEach(rn => {
       if (!currentRoomPriceNumbers.has(rn)) {
         append({ roomNumber: rn, price: DEFAULT_ROOM_PRICE });
       }
     });
 
-    // Remove fields for deselected rooms
     const indicesToRemove: number[] = [];
     roomPriceFields.forEach((field, index) => {
-      if (!newSelectedRoomNumbers.has(field.roomNumber)) {
+      if (!newSelectedRoomNumbersSet.has(field.roomNumber)) {
         indicesToRemove.push(index);
       }
     });
-    // Remove in reverse order to avoid index shifting issues
     for (let i = indicesToRemove.length - 1; i >= 0; i--) {
       remove(indicesToRemove[i]);
     }
-  }, [selectedRoomNumbers, roomPriceFields, append, remove]);
+  }, [selectedRoomNumbersInForm, roomPriceFields, append, remove]);
 
 
   async function handleSubmit(data: BookingFormValues) {
     try {
-      // The data already contains roomPriceDetails in the correct format for the form values
-      // This will be transformed into roomPrices in the page.tsx before calling the hook
       await onSubmit(data);
       toast({
         title: isEditMode ? 'Booking Updated' : 'Booking Created',
@@ -152,6 +190,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false 
       <CardHeader>
         <CardTitle className="font-headline text-2xl">{isEditMode ? 'Edit Booking' : 'Add New Booking'}</CardTitle>
       </CardHeader>
+      <TooltipProvider>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)}>
           <CardContent className="space-y-6">
@@ -190,50 +229,67 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false 
                   <div className="mb-2">
                     <FormLabel className="text-base">Select Rooms</FormLabel>
                     <FormDescription>
-                      Choose one or more rooms for this booking.
+                      Choose one or more rooms for this booking. Unavailable rooms for selected dates are disabled.
                     </FormDescription>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {ROOM_NUMBERS.map((roomNum) => (
-                    <FormField
-                      key={roomNum}
-                      control={form.control}
-                      name="roomNumbers"
-                      render={({ field }) => {
-                        return (
-                          <FormItem
-                            key={roomNum}
-                            className="flex flex-row items-start space-x-3 space-y-0 p-3 border rounded-md hover:bg-muted/50"
-                          >
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value?.includes(roomNum)}
-                                onCheckedChange={(checked) => {
-                                  return checked
-                                    ? field.onChange([...(field.value || []), roomNum])
-                                    : field.onChange(
-                                        (field.value || []).filter(
-                                          (value) => value !== roomNum
-                                        )
-                                      )
-                                }}
-                              />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              Room {roomNum}
-                            </FormLabel>
-                          </FormItem>
-                        )
-                      }}
-                    />
-                  ))}
+                  {ROOM_NUMBERS.map((roomNum) => {
+                    const isRoomConflicting = conflictingRooms.has(roomNum);
+                    return (
+                      <FormField
+                        key={roomNum}
+                        control={form.control}
+                        name="roomNumbers"
+                        render={({ field }) => {
+                          return (
+                            <Tooltip delayDuration={300}>
+                              <TooltipTrigger asChild>
+                                <FormItem
+                                  className={cn(
+                                    "flex flex-row items-start space-x-3 space-y-0 p-3 border rounded-md hover:bg-muted/50",
+                                    isRoomConflicting && "bg-destructive/10 border-destructive/30 cursor-not-allowed opacity-70"
+                                  )}
+                                >
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={field.value?.includes(roomNum)}
+                                      onCheckedChange={(checked) => {
+                                        if (isRoomConflicting && checked) return; // Prevent checking a disabled room
+                                        return checked
+                                          ? field.onChange([...(field.value || []), roomNum])
+                                          : field.onChange(
+                                              (field.value || []).filter(
+                                                (value) => value !== roomNum
+                                              )
+                                            )
+                                      }}
+                                      disabled={isRoomConflicting}
+                                      aria-disabled={isRoomConflicting}
+                                    />
+                                  </FormControl>
+                                  <FormLabel className={cn("font-normal", isRoomConflicting && "cursor-not-allowed")}>
+                                    Room {roomNum}
+                                  </FormLabel>
+                                </FormItem>
+                              </TooltipTrigger>
+                              {isRoomConflicting && (
+                                <TooltipContent side="bottom">
+                                  <p className="flex items-center gap-1"><InfoIcon className="h-4 w-4" /> Room {roomNum} is booked for these dates.</p>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                          );
+                        }}
+                      />
+                    );
+                  })}
                   </div>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {selectedRoomNumbers && selectedRoomNumbers.length > 0 && (
+            {selectedRoomNumbersInForm && selectedRoomNumbersInForm.length > 0 && (
               <div className="space-y-4">
                 <FormLabel className="text-base">Room Prices (Per Night)</FormLabel>
                 {roomPriceFields.map((field, index) => (
@@ -375,12 +431,13 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false 
             />
           </CardContent>
           <CardFooter>
-            <Button type="submit" className="w-full md:w-auto" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? 'Saving...' : (isEditMode ? 'Save Changes' : 'Create Booking')}
+            <Button type="submit" className="w-full md:w-auto" disabled={form.formState.isSubmitting || bookingsLoading}>
+              {bookingsLoading ? 'Checking availability...' : (form.formState.isSubmitting ? 'Saving...' : (isEditMode ? 'Save Changes' : 'Create Booking'))}
             </Button>
           </CardFooter>
         </form>
       </Form>
+      </TooltipProvider>
     </Card>
   );
 }
