@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { format, differenceInDays } from 'date-fns';
-import { Printer } from 'lucide-react'; // Removed IndianRupee from here, will use char
+import { Printer } from 'lucide-react';
 
 interface InvoiceDetailsProps {
   booking: Booking;
@@ -77,10 +77,10 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
                           <p className="text-muted-foreground">{format(new Date(booking.checkInDate), 'MMM d')} - {format(new Date(booking.checkOutDate), 'MMM d, yyyy')}</p>
                         </td>
                         <td className="hidden px-3 py-4 text-right text-sm text-muted-foreground sm:table-cell">
-                          ₹{roomPrice.price.toFixed(2)}
+                          {'\u20B9'}{roomPrice.price.toFixed(2)}
                         </td>
                         <td className="py-4 pl-3 pr-4 text-right text-sm font-medium text-foreground sm:pr-6">
-                          ₹{(roomPrice.price * nights).toFixed(2)}
+                          {'\u20B9'}{(roomPrice.price * nights).toFixed(2)}
                         </td>
                       </tr>
                     ))}
@@ -94,7 +94,7 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
                         Total
                       </th>
                       <td className="pt-4 pl-3 pr-4 text-right text-sm font-semibold text-foreground sm:pr-6">
-                         ₹{booking.totalAmount.toFixed(2)}
+                         {'\u20B9'}{booking.totalAmount.toFixed(2)}
                       </td>
                     </tr>
                   </tfoot>
@@ -121,3 +121,4 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
     </Card>
   );
 }
+

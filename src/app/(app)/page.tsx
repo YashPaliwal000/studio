@@ -17,7 +17,7 @@ const getDashboardSummary = () => {
   return {
     todayArrivals,
     availableRoomsDisplay: `${availableRooms} / ${totalRooms}`,
-    todaysRevenue: `₹${todaysRevenue}`,
+    todaysRevenue: `\u20B9${todaysRevenue}`,
   };
 };
 
@@ -91,3 +91,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
