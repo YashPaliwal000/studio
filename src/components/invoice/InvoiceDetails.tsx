@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { format, differenceInDays } from 'date-fns';
-import { Printer, Terminal } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Printer } from 'lucide-react';
 
 
 interface InvoiceDetailsProps {
@@ -42,23 +41,19 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
   const nights = differenceInDays(new Date(booking.checkOutDate), new Date(booking.checkInDate)) || 1;
 
   const handleShareOnWhatsApp = () => {
-    const invoiceLink = typeof window !== 'undefined' ? window.location.href : ''; 
+    // Construct the public invoice link
+    const publicInvoiceLink = typeof window !== 'undefined' 
+      ? `${window.location.origin}/guest-invoice/${booking.id}`
+      : ''; 
     
-    let message = `Invoice for ${booking.guestName} from ${appName}:\n\n`;
-    message += `Booking ID: INV-${booking.id.substring(0, 8).toUpperCase()}\n`;
+    let message = `Hello ${booking.guestName},\n\n`;
+    message += `Thank you for choosing ${appName}! You can view and download your invoice for booking ID INV-${booking.id.substring(0, 8).toUpperCase()} here:\n`;
+    message += `${publicInvoiceLink}\n\n`;
+    message += `Booking Details:\n`;
     message += `Check-in: ${format(new Date(booking.checkInDate), 'PPP')}\n`;
     message += `Check-out: ${format(new Date(booking.checkOutDate), 'PPP')}\n`;
-    message += `Nights: ${nights}\n`;
-    message += `Rooms: ${booking.roomNumbers.map(getRoomName).join(', ')}\n`;
-    if (booking.extraItems && booking.extraItems.length > 0) {
-        message += `Extra Items:\n`;
-        booking.extraItems.forEach(item => {
-            message += `  - ${item.name} (Qty: ${item.quantity}, Price: Rs.${(item.price * item.quantity).toFixed(2)})\n`;
-        });
-    }
-    message += `Total Amount: Rs.${booking.totalAmount.toFixed(2)}\n\n`;
-    message += `View details: ${invoiceLink}\n\n`;
-    message += `(Please find the PDF invoice attached if saved, or use the link above to view.)`;
+    message += `Total Amount: Rs. ${booking.totalAmount.toFixed(2)}\n\n`;
+    message += `We hope you enjoyed your stay!`;
 
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
@@ -69,7 +64,7 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
 
 
   return (
-    <Card className="max-w-3xl mx-auto shadow-xl print:shadow-none print:border-none">
+    <Card className="max-w-3xl mx-auto shadow-xl print:shadow-none print:border-none print:bg-card">
       <CardHeader className="bg-muted/30 p-6 sm:p-8 print:bg-transparent">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
           <div>
@@ -127,7 +122,7 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
                           {nights} night{nights > 1 ? 's' : ''}
                         </td>
                         <td className="py-4 pl-3 pr-4 text-right text-sm font-medium text-foreground sm:pr-6">
-                          {(roomPrice.price * nights).toFixed(2)}
+                          Rs. {(roomPrice.price * nights).toFixed(2)}
                         </td>
                       </tr>
                     ))}
@@ -147,7 +142,7 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
                           {item.quantity}
                         </td>
                         <td className="py-2 pl-3 pr-4 text-right text-sm font-medium text-foreground sm:pr-6">
-                          {(item.price * item.quantity).toFixed(2)}
+                          Rs. {(item.price * item.quantity).toFixed(2)}
                         </td>
                       </tr>
                     ))}
@@ -192,4 +187,3 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
     </Card>
   );
 }
-
