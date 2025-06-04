@@ -39,3 +39,10 @@ next-env.d.ts
 
 # User-specific booking data
 /data/bookings.json
+
+# Deployment files
+deploy.sh
+setup-nginx.sh
+copy-build.sh
+cleanup.sh
+copy-to-server.sh
