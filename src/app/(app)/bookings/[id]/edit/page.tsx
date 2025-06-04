@@ -5,70 +5,127 @@ import type { BookingFormValues } from '@/components/bookings/BookingForm';
 import { useBookings } from '@/hooks/useBookings';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import type { Booking } from '@/lib/types';
+import type { Booking, RoomPrice, ExtraItem } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button'; // Added import for Button
+import { Button } from '@/components/ui/button';
 import { differenceInDays } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { nanoid } from 'nanoid';
 
 export default function EditBookingPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { getBookingById, updateBooking } = useBookings();
-  const [initialDataForForm, setInitialDataForForm] = useState<Partial<BookingFormValues> | undefined>(undefined);
-  const [loading, setLoading] = useState(true);
+  const { getBookingById, updateBooking, bookings: allBookings, loading: bookingsLoadingHook } = useBookings();
+  const [initialDataForForm, setInitialDataForForm] = useState<Partial<BookingFormValues & { id?: string; roomPrices?: RoomPrice[], extraItems?: ExtraItem[] } > | undefined>(undefined);
+  const [loadingPage, setLoadingPage] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
+    if (bookingsLoadingHook) return; 
+
     if (id) {
       const booking = getBookingById(id as string);
       if (booking) {
-        // Map Booking to BookingFormValues
         const { totalAmount, createdAt, updatedAt, ...formData } = booking;
-        setInitialDataForForm({
+         const formValues: Partial<BookingFormValues & { id: string; roomPrices?: RoomPrice[]; extraItems?: ExtraItem[] }> = {
           ...formData,
-          checkInDate: new Date(booking.checkInDate), // ensure Date objects
-          checkOutDate: new Date(booking.checkOutDate), // ensure Date objects
-          pricePerNight: booking.pricePerNight, // This is now part of Booking type
-        });
+          id: booking.id, 
+          roomNumbers: booking.roomNumbers,
+          checkInDate: new Date(booking.checkInDate),
+          checkOutDate: new Date(booking.checkOutDate),
+          roomPriceDetails: booking.roomPrices.map(rp => ({ roomNumber: rp.roomNumber, price: rp.price })),
+          extraItems: booking.extraItems?.map(ei => ({ ...ei, id: ei.id || nanoid() })) || [],
+          roomPrices: booking.roomPrices, // keep original roomPrices for BookingForm initialData
+        };
+        setInitialDataForForm(formValues);
       } else {
         setError('Booking not found.');
       }
-      setLoading(false);
+      setLoadingPage(false);
     }
-  }, [id, getBookingById]);
+  }, [id, getBookingById, bookingsLoadingHook]);
 
   const handleSubmit = async (data: BookingFormValues) => {
-    if (!id) return;
+    if (!id) return Promise.reject(new Error('Booking ID is missing'));
 
     const checkIn = new Date(data.checkInDate);
     const checkOut = new Date(data.checkOutDate);
 
+    for (const roomNum of data.roomNumbers) {
+      for (const existingBooking of allBookings) {
+        if (existingBooking.id === id) continue; 
+        if (existingBooking.status === 'Cancelled') continue;
+        if (!existingBooking.roomNumbers.includes(roomNum)) continue;
+
+        const existingCheckIn = new Date(existingBooking.checkInDate);
+        const existingCheckOut = new Date(existingBooking.checkOutDate);
+
+        if (checkIn < existingCheckOut && checkOut > existingCheckIn) {
+          toast({
+            title: 'Booking Conflict',
+            description: `Room ${roomNum} is already booked for the selected dates. Please choose different rooms or dates.`,
+            variant: 'destructive',
+          });
+          return Promise.reject(new Error('Booking conflict')); 
+        }
+      }
+    }
+
     let nights = differenceInDays(checkOut, checkIn);
      if (nights <= 0) {
-      nights = 1; // Or handle error, form validation should prevent this
+      nights = 1;
     }
-    const totalAmount = data.pricePerNight * nights;
 
-    // Construct the data to be saved, including calculated totalAmount
+    const roomPrices: RoomPrice[] = data.roomPriceDetails.map(rpd => ({
+      roomNumber: rpd.roomNumber,
+      price: rpd.price,
+    }));
+    
+    const totalRoomAmount = roomPrices.reduce((sum, room) => {
+      return sum + (room.price * nights);
+    }, 0);
+
+    const extraItemsToSave: ExtraItem[] = (data.extraItems || []).map(item => ({
+        id: item.id || nanoid(),
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        unit: item.unit,
+    }));
+
+    const totalExtraItemsAmount = extraItemsToSave.reduce((sum, item) => {
+        return sum + (item.price * item.quantity);
+    }, 0);
+    
+    const totalAmount = totalRoomAmount + totalExtraItemsAmount;
+
     const bookingDataToUpdate: Partial<Omit<Booking, 'id' | 'createdAt'>> = {
-        ...data, // Spread all form values
+        guestName: data.guestName,
+        guestContact: data.guestContact,
+        roomNumbers: data.roomNumbers,
         checkInDate: checkIn,
         checkOutDate: checkOut,
-        pricePerNight: data.pricePerNight,
+        numberOfGuests: data.numberOfGuests,
+        roomPrices: roomPrices,
+        extraItems: extraItemsToSave,
         totalAmount: totalAmount,
+        status: data.status,
+        bookingSource: data.bookingSource,
+        notes: data.notes,
       };
     return updateBooking(id as string, bookingDataToUpdate);
   };
 
-  if (loading) {
+  if (loadingPage || bookingsLoadingHook) {
     return (
       <Card className="w-full max-w-2xl mx-auto">
         <CardHeader>
           <Skeleton className="h-8 w-1/2" />
         </CardHeader>
         <CardContent className="space-y-6">
-          {[...Array(6)].map((_, i) => ( // Increased skeleton items for pricePerNight field
+          {[...Array(10)].map((_, i) => ( 
             <div key={i} className="space-y-2">
               <Skeleton className="h-4 w-1/4" />
               <Skeleton className="h-10 w-full" />
@@ -100,7 +157,12 @@ export default function EditBookingPage() {
 
   return (
     <div className="py-8">
-      <BookingForm initialData={initialDataForForm} onSubmit={handleSubmit} isEditMode={true} />
+      <BookingForm 
+        initialData={initialDataForForm} 
+        onSubmit={handleSubmit} 
+        isEditMode={true}
+        currentBookingId={id as string} 
+      />
     </div>
   );
 }

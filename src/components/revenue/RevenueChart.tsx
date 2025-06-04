@@ -1,3 +1,4 @@
+
 'use client';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Line, LineChart, Pie, PieChart, Cell } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -51,11 +52,11 @@ export default function RevenueCharts({ bookings }: RevenueChartProps) {
               <LineChart data={dailyRevenueData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="date" stroke="hsl(var(--foreground))" fontSize={12} />
-                <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `₹${value}`} />
+                <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickFormatter={(value) => `Rs. ${value}`} />
                 <Tooltip
                   contentStyle={{ backgroundColor: "hsl(var(--background))", border: "1px solid hsl(var(--border))" }}
                   labelStyle={{ color: "hsl(var(--foreground))" }}
-                  formatter={(value: number) => [`₹${value.toFixed(2)}`, 'Revenue']}
+                  formatter={(value: number) => [`Rs. ${value.toFixed(2)}`, 'Revenue']}
                 />
                 <Line type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4, fill: "hsl(var(--primary))" }} activeDot={{ r: 6 }} />
               </LineChart>
@@ -103,3 +104,4 @@ export default function RevenueCharts({ bookings }: RevenueChartProps) {
     </div>
   );
 }
+

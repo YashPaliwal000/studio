@@ -1,0 +1,98 @@
+[
+  {
+    "guestName": "Yash",
+    "guestContact": "yahcapstan@gmail.com",
+    "roomNumbers": [
+      1
+    ],
+    "checkInDate": "2025-06-02T18:30:00.000Z",
+    "checkOutDate": "2025-06-04T18:30:00.000Z",
+    "numberOfGuests": 1,
+    "status": "Confirmed",
+    "notes": "",
+    "totalAmount": 3000,
+    "id": "SROQwU15Bbleo2Q0F-TDp",
+    "createdAt": "2025-06-03T10:52:31.958Z",
+    "roomPrices": [
+      {
+        "roomNumber": 1,
+        "price": 1500
+      }
+    ],
+    "extraItems": []
+  },
+  {
+    "guestName": "Kamal",
+    "guestContact": "kamal@gmail.com",
+    "roomNumbers": [
+      2
+    ],
+    "checkInDate": "2025-06-03T18:30:00.000Z",
+    "checkOutDate": "2025-06-04T18:30:00.000Z",
+    "numberOfGuests": 2,
+    "roomPrices": [
+      {
+        "roomNumber": 2,
+        "price": 2500
+      }
+    ],
+    "totalAmount": 2500,
+    "status": "Confirmed",
+    "bookingSource": "Phone",
+    "notes": "",
+    "id": "tVrIsdhqurSyAxwg-ndje",
+    "createdAt": "2025-06-04T08:32:21.865Z",
+    "extraItems": []
+  },
+  {
+    "guestName": "Somesh",
+    "guestContact": "9897074513",
+    "roomNumbers": [
+      3,
+      4
+    ],
+    "checkInDate": "2025-06-03T18:30:00.000Z",
+    "checkOutDate": "2025-06-06T18:30:00.000Z",
+    "numberOfGuests": 4,
+    "roomPrices": [
+      {
+        "roomNumber": 3,
+        "price": 3000
+      },
+      {
+        "roomNumber": 4,
+        "price": 1500
+      }
+    ],
+    "totalAmount": 16500,
+    "status": "Confirmed",
+    "bookingSource": "Phone",
+    "notes": "",
+    "id": "sqG-b4dYs-M_7Gqu8TDTH",
+    "createdAt": "2025-06-04T08:33:43.154Z",
+    "extraItems": [
+      {
+        "id": "qtLPBdRsDAES9k8jW3TwH",
+        "name": "Tea",
+        "price": 20,
+        "quantity": 10,
+        "unit": "cup"
+      },
+      {
+        "id": "4FhlKlemd7kJOqXXZgbOU",
+        "name": "Meals",
+        "price": 250,
+        "quantity": 10,
+        "unit": "Plate"
+      },
+      {
+        "id": "a62ieLtkoVUmamCHetot2",
+        "name": "Pakoda",
+        "price": 150,
+        "quantity": 2,
+        "unit": "Plate"
+      }
+    ],
+    "updatedAt": "2025-06-04T10:43:10.038Z"
+  }
+]

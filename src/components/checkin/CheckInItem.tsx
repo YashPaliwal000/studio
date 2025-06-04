@@ -1,9 +1,11 @@
+
 'use client';
 import { format } from 'date-fns';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { Booking } from '@/lib/types';
+import { ROOM_CONFIG } from '@/lib/constants';
 import { User, CalendarDays, BedDouble, CheckCircle2, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 
@@ -12,8 +14,16 @@ interface CheckInItemProps {
   onCheckIn: (id: string) => void;
 }
 
+const getRoomNames = (roomIds: number[]): string => {
+  return roomIds.map(id => {
+    const room = ROOM_CONFIG.find(r => r.id === id);
+    return room ? room.name : `Room ${id}`;
+  }).join(', ');
+};
+
 export default function CheckInItem({ booking, onCheckIn }: CheckInItemProps) {
   const canCheckIn = booking.status === 'Confirmed';
+  const roomNames = getRoomNames(booking.roomNumbers);
 
   return (
     <Card className="shadow-md hover:shadow-lg transition-shadow">
@@ -25,7 +35,7 @@ export default function CheckInItem({ booking, onCheckIn }: CheckInItemProps) {
             {booking.status}
           </Badge>
         </div>
-        <CardDescription>Room {booking.roomNumber}</CardDescription>
+        <CardDescription>Rooms: {roomNames}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-1 text-sm">
         <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /> {booking.guestContact}</div>

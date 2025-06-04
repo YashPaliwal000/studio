@@ -2,16 +2,30 @@
 export type BookingStatus = 'Confirmed' | 'CheckedIn' | 'CheckedOut' | 'Cancelled';
 export type BookingSource = 'Online' | 'Walk-in' | 'Phone' | 'Other';
 
+export interface RoomPrice {
+  roomNumber: number;
+  price: number;
+}
+
+export interface ExtraItem {
+  id: string; // For react-hook-form field array key
+  name: string;
+  price: number;
+  quantity: number;
+  unit: string;
+}
+
 export interface Booking {
   id: string;
   guestName: string;
   guestContact: string;
-  roomNumber: number;
+  roomNumbers: number[];
   checkInDate: Date;
   checkOutDate: Date;
   numberOfGuests: number;
-  pricePerNight: number; // New field
-  totalAmount: number; // Will be calculated: pricePerNight * numberOfNights
+  roomPrices: RoomPrice[];
+  extraItems?: ExtraItem[]; // Added
+  totalAmount: number;
   status: BookingStatus;
   bookingSource?: BookingSource;
   notes?: string;
