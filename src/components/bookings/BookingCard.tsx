@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { Booking } from '@/lib/types';
 import { ROOM_CONFIG } from '@/lib/constants';
-import { Edit, Trash2, User, Phone, CalendarDays, BedDouble, Users, IndianRupee, CheckCircle, Info, PackageOpen, FileText } from 'lucide-react';
+import { Edit, Trash2, User, Phone, CalendarDays, BedDouble, Users, CheckCircle, Info, PackageOpen, FileText } from 'lucide-react';
 
 interface BookingCardProps {
   booking: Booking;
@@ -53,9 +53,8 @@ export default function BookingCard({ booking, onDelete }: BookingCardProps) {
         <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Check-out: {format(new Date(booking.checkOutDate), 'PPP')}</div>
         <div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /> Guests: {booking.numberOfGuests}</div>
         <div className="flex items-center gap-2">
-          <IndianRupee className="h-4 w-4 text-muted-foreground" />
-          {booking.roomPrices.length > 1 ? `Avg. ₹${averagePricePerNight.toFixed(2)}/night | ` : (booking.roomPrices[0] ? `Price ₹${booking.roomPrices[0].price.toFixed(2)}/night | ` : '')}
-          Total: ₹{booking.totalAmount.toFixed(2)}
+          {booking.roomPrices.length > 1 ? `Avg. Rs. ${averagePricePerNight.toFixed(2)}/night | ` : (booking.roomPrices[0] ? `Price Rs. ${booking.roomPrices[0].price.toFixed(2)}/night | ` : '')}
+          Total: Rs. {booking.totalAmount.toFixed(2)}
         </div>
         {booking.bookingSource && <div className="flex items-center gap-2"><PackageOpen className="h-4 w-4 text-muted-foreground" /> Source: {booking.bookingSource}</div>}
         {booking.notes && <div className="flex items-start gap-2"><Info className="h-4 w-4 text-muted-foreground mt-1" /> Notes: <span className="italic">{booking.notes}</span></div>}

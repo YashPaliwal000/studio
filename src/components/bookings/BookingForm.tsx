@@ -271,7 +271,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                                     />
                                   </FormControl>
                                   <FormLabel className={cn("font-normal", isRoomConflicting && "cursor-not-allowed")}>
-                                    {room.name} (₹{room.defaultPrice})
+                                    {room.name} (Rs. {room.defaultPrice})
                                   </FormLabel>
                                 </FormItem>
                               </TooltipTrigger>
@@ -307,12 +307,12 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                         <FormLabel className="min-w-[120px] sm:min-w-[150px]">{roomDetails?.name || `Room ${field.roomNumber}`}:</FormLabel>
                         <FormControl>
                            <div className="relative w-full">
-                            <span className="absolute left-3 top-1/2 h-full flex items-center text-muted-foreground text-sm pointer-events-none">₹</span>
+                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">Rs.</span>
                             <Input
                               type="number"
                               placeholder={`Price for ${roomDetails?.name || `Room ${field.roomNumber}`}`}
                               {...priceField}
-                              className="pl-7" 
+                              className="pl-10" 
                             />
                           </div>
                         </FormControl>
