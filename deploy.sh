@@ -20,8 +20,13 @@ sudo npm install -g pm2
 # Install project dependencies
 npm install
 
-# Build the application
-npm run build
+# Build the application with increased memory limit and timeout
+echo "Starting Next.js build..."
+export NODE_OPTIONS="--max-old-space-size=4096"
+timeout 1800 npm run build || {
+    echo "Build failed or timed out after 30 minutes"
+    exit 1
+}
 
 # Configure Nginx
 sudo tee /etc/nginx/sites-available/palisnest.in << EOF
