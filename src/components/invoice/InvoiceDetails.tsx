@@ -56,7 +56,7 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
             message += `  - ${item.name} (Qty: ${item.quantity}, Price: Rs.${(item.price * item.quantity).toFixed(2)})\n`;
         });
     }
-    message += `Total Amount: Rs. ${booking.totalAmount.toFixed(2)}\n\n`;
+    message += `Total Amount: Rs.${booking.totalAmount.toFixed(2)}\n\n`;
     message += `View details: ${invoiceLink}\n\n`;
     message += `(Please find the PDF invoice attached if saved, or use the link above to view.)`;
 
@@ -173,18 +173,6 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
         
         <Separator className="my-8 print:hidden" />
 
-         <Alert className="print:hidden mb-6">
-          <Terminal className="h-4 w-4" />
-          <AlertTitle>Sharing Invoice PDF</AlertTitle>
-          <AlertDescription>
-            To share the invoice as a PDF on WhatsApp:
-            <ol className="list-decimal list-inside mt-1">
-              <li>First, click the "Print / Save as PDF" button to save the invoice.</li>
-              <li>Then, click "Share on WhatsApp" and manually attach the saved PDF file to your message.</li>
-            </ol>
-          </AlertDescription>
-        </Alert>
-
         <div className="text-sm text-muted-foreground print:mt-12">
           <p className="mb-1">Thank you for staying with us at {appName}!</p>
           {booking.bookingSource && <p>Booking Source: {booking.bookingSource}</p>}
@@ -204,3 +192,4 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
     </Card>
   );
 }
+

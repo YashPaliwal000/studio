@@ -18,7 +18,8 @@
         "roomNumber": 1,
         "price": 1500
       }
-    ]
+    ],
+    "extraItems": []
   },
   {
     "guestName": "Kamal",
@@ -40,7 +41,8 @@
     "bookingSource": "Phone",
     "notes": "",
     "id": "tVrIsdhqurSyAxwg-ndje",
-    "createdAt": "2025-06-04T08:32:21.865Z"
+    "createdAt": "2025-06-04T08:32:21.865Z",
+    "extraItems": []
   },
   {
     "guestName": "Somesh",
@@ -62,11 +64,35 @@
         "price": 1500
       }
     ],
-    "totalAmount": 13500,
+    "totalAmount": 16500,
     "status": "Confirmed",
     "bookingSource": "Phone",
     "notes": "",
     "id": "sqG-b4dYs-M_7Gqu8TDTH",
-    "createdAt": "2025-06-04T08:33:43.154Z"
+    "createdAt": "2025-06-04T08:33:43.154Z",
+    "extraItems": [
+      {
+        "id": "qtLPBdRsDAES9k8jW3TwH",
+        "name": "Tea",
+        "price": 20,
+        "quantity": 10,
+        "unit": "cup"
+      },
+      {
+        "id": "4FhlKlemd7kJOqXXZgbOU",
+        "name": "Meals",
+        "price": 250,
+        "quantity": 10,
+        "unit": "Plate"
+      },
+      {
+        "id": "a62ieLtkoVUmamCHetot2",
+        "name": "Pakoda",
+        "price": 150,
+        "quantity": 2,
+        "unit": "Plate"
+      }
+    ],
+    "updatedAt": "2025-06-04T10:43:10.038Z"
   }
 ]
