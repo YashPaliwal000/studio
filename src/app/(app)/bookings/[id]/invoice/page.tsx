@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { APP_NAME } from '@/lib/constants';
 import { useEffect, useState } from 'react';
 import type { Booking } from '@/lib/types';
+import { format as formatDate } from 'date-fns';
 
 export default function InvoicePage() {
   const { id } = useParams<{ id: string }>();
@@ -16,9 +17,16 @@ export default function InvoicePage() {
   const [booking, setBooking] = useState<Booking | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [originalTitle, setOriginalTitle] = useState<string | null>(null);
 
   useEffect(() => {
-    if (bookingsLoading) { // Wait for bookings to be loaded
+    if (typeof document !== 'undefined' && !originalTitle) {
+      setOriginalTitle(document.title);
+    }
+  }, [originalTitle]);
+
+  useEffect(() => {
+    if (bookingsLoading) {
       setLoading(true);
       return;
     }
@@ -26,12 +34,26 @@ export default function InvoicePage() {
       const fetchedBooking = getBookingById(id as string);
       if (fetchedBooking) {
         setBooking(fetchedBooking);
+        // Set document title for PDF saving
+        const today = new Date();
+        const formattedDate = formatDate(today, 'yyyy-MM-dd');
+        const invoiceIdSuffix = fetchedBooking.id.substring(0, 8).toUpperCase();
+        if (typeof document !== 'undefined') {
+          document.title = `invoice_${formattedDate}_${invoiceIdSuffix}.pdf`;
+        }
       } else {
         setError('Invoice not found. The booking may have been deleted or does not exist.');
       }
     }
     setLoading(false);
-  }, [id, getBookingById, bookingsLoading]);
+
+    // Cleanup: restore original title when component unmounts
+    return () => {
+      if (typeof document !== 'undefined' && originalTitle) {
+        document.title = originalTitle;
+      }
+    };
+  }, [id, getBookingById, bookingsLoading, originalTitle]);
 
   if (loading) {
     return (

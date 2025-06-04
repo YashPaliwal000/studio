@@ -1,0 +1,44 @@
+[
+  {
+    "id": "init-alice-wonderland",
+    "guestName": "Alice Wonderland",
+    "guestContact": "alice@example.com",
+    "roomNumber": 1,
+    "checkInDate": "2025-06-04T10:52:20.486Z",
+    "checkOutDate": "2025-06-06T10:52:20.486Z",
+    "numberOfGuests": 2,
+    "pricePerNight": 150,
+    "totalAmount": 300,
+    "status": "Confirmed",
+    "bookingSource": "Online",
+    "createdAt": "2025-06-03T10:52:20.486Z"
+  },
+  {
+    "id": "init-bob-builder",
+    "guestName": "Bob The Builder",
+    "guestContact": "bob@example.com",
+    "roomNumber": 2,
+    "checkInDate": "2025-06-05T10:52:20.486Z",
+    "checkOutDate": "2025-06-08T10:52:20.486Z",
+    "numberOfGuests": 1,
+    "pricePerNight": 120,
+    "totalAmount": 360,
+    "status": "Confirmed",
+    "bookingSource": "Phone",
+    "createdAt": "2025-06-03T10:52:20.486Z"
+  },
+  {
+    "guestName": "Yash",
+    "guestContact": "yahcapstan@gmail.com",
+    "roomNumber": 1,
+    "checkInDate": "2025-06-02T18:30:00.000Z",
+    "checkOutDate": "2025-06-04T18:30:00.000Z",
+    "numberOfGuests": 1,
+    "pricePerNight": 1500,
+    "status": "Confirmed",
+    "notes": "",
+    "totalAmount": 3000,
+    "id": "SROQwU15Bbleo2Q0F-TDp",
+    "createdAt": "2025-06-03T10:52:31.958Z"
+  }
+]
