@@ -3,10 +3,16 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
-import type { Booking } from '@/lib/types';
+import type { Booking, RoomPrice } from '@/lib/types';
+import { differenceInDays } from 'date-fns';
 
 const dataDirectory = path.join(process.cwd(), 'data');
 const dataFilePath = path.join(dataDirectory, 'bookings.json');
+
+const calculateNights = (checkIn: Date | string, checkOut: Date | string): number => {
+  const nights = differenceInDays(new Date(checkOut), new Date(checkIn));
+  return nights > 0 ? nights : 1;
+};
 
 async function ensureDataFileExists(): Promise<Booking[]> {
   try {
@@ -17,7 +23,28 @@ async function ensureDataFileExists(): Promise<Booking[]> {
 
   try {
     const fileData = await fs.readFile(dataFilePath, 'utf-8');
-    return JSON.parse(fileData) as Booking[];
+    const bookingsFromFile = JSON.parse(fileData) as any[];
+    // Migrate old data if necessary
+    return bookingsFromFile.map(b => {
+      if (!b.roomPrices && b.pricePerNight) {
+        const nights = calculateNights(b.checkInDate, b.checkOutDate);
+        b.roomPrices = b.roomNumbers.map((rn: number) => ({
+          roomNumber: rn,
+          price: b.pricePerNight,
+        }));
+        // Recalculate totalAmount based on new structure if pricePerNight was per room per night
+        b.totalAmount = b.roomPrices.reduce((sum: number, rp: RoomPrice) => sum + (rp.price * nights), 0);
+        delete b.pricePerNight;
+      } else if (!b.roomPrices) { // Fallback if even pricePerNight is missing
+         const nights = calculateNights(b.checkInDate, b.checkOutDate);
+         b.roomPrices = b.roomNumbers.map((rn: number) => ({
+            roomNumber: rn,
+            price: 1500, // Default price
+         }));
+         b.totalAmount = b.roomPrices.reduce((sum: number, rp: RoomPrice) => sum + (rp.price * nights), 0);
+      }
+      return b as Booking;
+    });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       const initialBookings = getInitialBookingsForFile();
@@ -29,19 +56,18 @@ async function ensureDataFileExists(): Promise<Booking[]> {
   }
 }
 
-const getInitialBookingsForFile = (): any[] => {
+const getInitialBookingsForFile = (): Booking[] => {
   const today = new Date();
-  return [
+  const bookingsRaw = [
     {
       id: 'init-alice-wonderland',
       guestName: 'Alice Wonderland',
       guestContact: 'alice@example.com',
-      roomNumbers: [1], // Changed to roomNumbers
+      roomNumbers: [1],
       checkInDate: new Date(new Date(today).setDate(today.getDate() + 1)).toISOString(),
       checkOutDate: new Date(new Date(today).setDate(today.getDate() + 3)).toISOString(),
       numberOfGuests: 2,
-      pricePerNight: 150,
-      totalAmount: 300, // 150 * 2 nights * 1 room
+      roomPrices: [{ roomNumber: 1, price: 150 }],
       status: 'Confirmed',
       bookingSource: 'Online',
       createdAt: new Date().toISOString(),
@@ -50,17 +76,25 @@ const getInitialBookingsForFile = (): any[] => {
       id: 'init-bob-builder',
       guestName: 'Bob The Builder',
       guestContact: 'bob@example.com',
-      roomNumbers: [2, 3], // Changed to roomNumbers
+      roomNumbers: [2, 3],
       checkInDate: new Date(new Date(today).setDate(today.getDate() + 2)).toISOString(),
       checkOutDate: new Date(new Date(today).setDate(today.getDate() + 5)).toISOString(),
       numberOfGuests: 3,
-      pricePerNight: 120,
-      totalAmount: 720, // 120 * 3 nights * 2 rooms
+      roomPrices: [
+        { roomNumber: 2, price: 120 },
+        { roomNumber: 3, price: 130 },
+      ],
       status: 'Confirmed',
       bookingSource: 'Phone',
       createdAt: new Date().toISOString(),
     },
   ];
+
+  return bookingsRaw.map(b => {
+    const nights = calculateNights(b.checkInDate, b.checkOutDate);
+    const totalAmount = b.roomPrices.reduce((sum, rp) => sum + (rp.price * nights), 0);
+    return { ...b, totalAmount } as Booking;
+  });
 };
 
 export async function GET() {
@@ -81,17 +115,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Invalid payload: Expected an array of bookings.' }, { status: 400 });
     }
 
-    const bookingsToWrite = bookingsPayload.map(booking => ({
-      ...booking,
-      // Ensure roomNumbers is an array, provide default if missing from old data or malformed
-      roomNumbers: Array.isArray(booking.roomNumbers) ? booking.roomNumbers : (typeof booking.roomNumber === 'number' ? [booking.roomNumber] : [1]),
-      checkInDate: new Date(booking.checkInDate).toISOString(),
-      checkOutDate: new Date(booking.checkOutDate).toISOString(),
-      createdAt: new Date(booking.createdAt).toISOString(),
-      updatedAt: booking.updatedAt ? new Date(booking.updatedAt).toISOString() : undefined,
-    }));
+    const bookingsToWrite = bookingsPayload.map(booking => {
+      // Ensure dates are ISO strings and roomPrices exists
+      const { pricePerNight, ...bookingData } = booking as any; // remove old field if present
+      
+      if (!bookingData.roomPrices && pricePerNight) {
+         const nights = calculateNights(bookingData.checkInDate, bookingData.checkOutDate);
+         bookingData.roomPrices = bookingData.roomNumbers.map((rn: number) => ({
+            roomNumber: rn,
+            price: pricePerNight
+         }));
+         bookingData.totalAmount = bookingData.roomPrices.reduce((sum: number, rp: RoomPrice) => sum + (rp.price * nights), 0);
+      } else if (!bookingData.roomPrices) { // Fallback for safety
+         const nights = calculateNights(bookingData.checkInDate, bookingData.checkOutDate);
+         bookingData.roomPrices = bookingData.roomNumbers.map((rn: number) => ({
+            roomNumber: rn,
+            price: 1500, // Default price
+         }));
+         bookingData.totalAmount = bookingData.roomPrices.reduce((sum: number, rp: RoomPrice) => sum + (rp.price * nights), 0);
+      }
 
-    await ensureDataFileExists();
+
+      return {
+      ...bookingData,
+      roomNumbers: Array.isArray(bookingData.roomNumbers) ? bookingData.roomNumbers : (typeof bookingData.roomNumber === 'number' ? [bookingData.roomNumber] : [1]),
+      roomPrices: Array.isArray(bookingData.roomPrices) ? bookingData.roomPrices : [],
+      checkInDate: new Date(bookingData.checkInDate).toISOString(),
+      checkOutDate: new Date(bookingData.checkOutDate).toISOString(),
+      createdAt: new Date(bookingData.createdAt).toISOString(),
+      updatedAt: bookingData.updatedAt ? new Date(bookingData.updatedAt).toISOString() : undefined,
+    }});
+
+    // ensureDataFileExists will handle creation or migration if file is read first.
+    // Here we are directly writing, so ensureDataFileExists is mainly for directory creation.
+    try {
+      await fs.access(dataDirectory);
+    } catch {
+      await fs.mkdir(dataDirectory, { recursive: true });
+    }
     await fs.writeFile(dataFilePath, JSON.stringify(bookingsToWrite, null, 2), 'utf-8');
     return NextResponse.json({ message: 'Bookings saved successfully' });
   } catch (error) {

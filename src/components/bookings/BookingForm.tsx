@@ -2,7 +2,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,10 +26,17 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import type { Booking, BookingStatus, BookingSource } from '@/lib/types';
+import type { Booking, BookingStatus, BookingSource, RoomPrice } from '@/lib/types';
 import { ROOM_NUMBERS, BOOKING_STATUSES, BOOKING_SOURCES } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { IndianRupee } from 'lucide-react';
+
+const roomPriceDetailSchema = z.object({
+  roomNumber: z.number(),
+  price: z.coerce.number().positive({ message: 'Price for each room must be positive.' }),
+});
 
 const bookingFormSchema = z.object({
   guestName: z.string().min(2, { message: 'Guest name must be at least 2 characters.' }),
@@ -38,22 +45,32 @@ const bookingFormSchema = z.object({
   checkInDate: z.date({ required_error: 'Check-in date is required.' }),
   checkOutDate: z.date({ required_error: 'Check-out date is required.' }),
   numberOfGuests: z.coerce.number().min(1, { message: 'At least one guest is required.' }),
-  pricePerNight: z.coerce.number().positive({ message: 'Price per night (per room) must be positive.' }),
+  roomPriceDetails: z.array(roomPriceDetailSchema).min(1, { message: 'Price for selected rooms must be provided.' }),
   status: z.enum(BOOKING_STATUSES),
   bookingSource: z.enum(BOOKING_SOURCES).optional(),
   notes: z.string().optional(),
 }).refine(data => data.checkOutDate > data.checkInDate, {
   message: "Check-out date must be after check-in date.",
   path: ["checkOutDate"],
+}).refine(data => {
+  const selectedRoomNumbers = new Set(data.roomNumbers);
+  const pricedRoomNumbers = new Set(data.roomPriceDetails.map(rp => rp.roomNumber));
+  return data.roomNumbers.length === data.roomPriceDetails.length &&
+         Array.from(selectedRoomNumbers).every(rn => pricedRoomNumbers.has(rn));
+}, {
+  message: "Price must be set for all selected rooms.",
+  path: ["roomPriceDetails"],
 });
 
 export type BookingFormValues = z.infer<typeof bookingFormSchema>;
 
 interface BookingFormProps {
-  initialData?: Partial<BookingFormValues & { checkInDate: Date, checkOutDate: Date}>;
-  onSubmit: (data: BookingFormValues) => Promise<any>; 
+  initialData?: Partial<BookingFormValues & { checkInDate: Date, checkOutDate: Date, roomPrices?: RoomPrice[] }>;
+  onSubmit: (data: BookingFormValues) => Promise<any>;
   isEditMode?: boolean;
 }
+
+const DEFAULT_ROOM_PRICE = 1500;
 
 export default function BookingForm({ initialData, onSubmit, isEditMode = false }: BookingFormProps) {
   const { toast } = useToast();
@@ -66,19 +83,55 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false 
         checkInDate: initialData.checkInDate ? new Date(initialData.checkInDate) : undefined,
         checkOutDate: initialData.checkOutDate ? new Date(initialData.checkOutDate) : undefined,
         roomNumbers: initialData.roomNumbers || [],
+        roomPriceDetails: initialData.roomPrices?.map(rp => ({ roomNumber: rp.roomNumber, price: rp.price })) ||
+                          initialData.roomNumbers?.map(rn => ({ roomNumber: rn, price: (initialData as any).pricePerNight || DEFAULT_ROOM_PRICE })) || [],
       } : {
       guestName: '',
       guestContact: '',
-      roomNumbers: [], 
+      roomNumbers: [],
       numberOfGuests: 1,
-      pricePerNight: 1500, 
+      roomPriceDetails: [],
       status: 'Confirmed',
       notes: '',
     },
   });
 
+  const { fields: roomPriceFields, append, remove, update } = useFieldArray({
+    control: form.control,
+    name: "roomPriceDetails",
+  });
+
+  const selectedRoomNumbers = form.watch('roomNumbers');
+
+  useEffect(() => {
+    const currentRoomPriceNumbers = new Set(roomPriceFields.map(f => f.roomNumber));
+    const newSelectedRoomNumbers = new Set(selectedRoomNumbers);
+
+    // Add new fields for newly selected rooms
+    newSelectedRoomNumbers.forEach(rn => {
+      if (!currentRoomPriceNumbers.has(rn)) {
+        append({ roomNumber: rn, price: DEFAULT_ROOM_PRICE });
+      }
+    });
+
+    // Remove fields for deselected rooms
+    const indicesToRemove: number[] = [];
+    roomPriceFields.forEach((field, index) => {
+      if (!newSelectedRoomNumbers.has(field.roomNumber)) {
+        indicesToRemove.push(index);
+      }
+    });
+    // Remove in reverse order to avoid index shifting issues
+    for (let i = indicesToRemove.length - 1; i >= 0; i--) {
+      remove(indicesToRemove[i]);
+    }
+  }, [selectedRoomNumbers, roomPriceFields, append, remove]);
+
+
   async function handleSubmit(data: BookingFormValues) {
     try {
+      // The data already contains roomPriceDetails in the correct format for the form values
+      // This will be transformed into roomPrices in the page.tsx before calling the hook
       await onSubmit(data);
       toast({
         title: isEditMode ? 'Booking Updated' : 'Booking Created',
@@ -134,7 +187,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false 
               name="roomNumbers"
               render={() => (
                 <FormItem>
-                  <div className="mb-4">
+                  <div className="mb-2">
                     <FormLabel className="text-base">Select Rooms</FormLabel>
                     <FormDescription>
                       Choose one or more rooms for this booking.
@@ -180,6 +233,38 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false 
               )}
             />
 
+            {selectedRoomNumbers && selectedRoomNumbers.length > 0 && (
+              <div className="space-y-4">
+                <FormLabel className="text-base">Room Prices (Per Night)</FormLabel>
+                {roomPriceFields.map((field, index) => (
+                   <FormField
+                    key={field.id}
+                    control={form.control}
+                    name={`roomPriceDetails.${index}.price`}
+                    render={({ field: priceField }) => (
+                      <FormItem className="flex flex-row items-center gap-4 p-3 border rounded-md">
+                        <FormLabel className="min-w-[80px]">Room {roomPriceFields[index].roomNumber}:</FormLabel>
+                        <FormControl>
+                           <div className="relative w-full">
+                            <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              type="number"
+                              placeholder={`Price for room ${roomPriceFields[index].roomNumber}`}
+                              {...priceField}
+                              className="pl-9"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ))}
+                 <FormMessage>{form.formState.errors.roomPriceDetails?.message || form.formState.errors.roomPriceDetails?.root?.message}</FormMessage>
+              </div>
+            )}
+
+
             <FormField
               control={form.control}
               name="numberOfGuests"
@@ -224,19 +309,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false 
                 )}
               />
             </div>
-             <FormField
-                control={form.control}
-                name="pricePerNight"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Price Per Night (Per Room, ₹)</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" placeholder="e.g., 1500.00" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}

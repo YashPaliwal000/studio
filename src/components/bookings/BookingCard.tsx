@@ -22,6 +22,10 @@ const statusColors: { [key in Booking['status']]: string } = {
 
 
 export default function BookingCard({ booking, onDelete }: BookingCardProps) {
+  const averagePricePerNight = booking.roomPrices.length > 0 
+    ? booking.roomPrices.reduce((sum, rp) => sum + rp.price, 0) / booking.roomPrices.length
+    : 0;
+
   return (
     <Card className="shadow-lg hover:shadow-xl transition-shadow w-full flex flex-col">
       <CardHeader>
@@ -39,7 +43,12 @@ export default function BookingCard({ booking, onDelete }: BookingCardProps) {
         <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Check-in: {format(new Date(booking.checkInDate), 'PPP')}</div>
         <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Check-out: {format(new Date(booking.checkOutDate), 'PPP')}</div>
         <div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /> Guests: {booking.numberOfGuests}</div>
-        <div className="flex items-center gap-2"><IndianRupee className="h-4 w-4 text-muted-foreground" /> Amount: ₹{booking.totalAmount.toFixed(2)}</div>
+        {/* Displaying average price per night if multiple rooms with different prices, or total amount */}
+        <div className="flex items-center gap-2">
+          <IndianRupee className="h-4 w-4 text-muted-foreground" /> 
+          {booking.roomPrices.length > 1 ? `Avg. ₹${averagePricePerNight.toFixed(2)}/night | ` : ''}
+          Total: ₹{booking.totalAmount.toFixed(2)}
+        </div>
         {booking.bookingSource && <div className="flex items-center gap-2"><PackageOpen className="h-4 w-4 text-muted-foreground" /> Source: {booking.bookingSource}</div>}
         {booking.notes && <div className="flex items-start gap-2"><Info className="h-4 w-4 text-muted-foreground mt-1" /> Notes: <span className="italic">{booking.notes}</span></div>}
       </CardContent>

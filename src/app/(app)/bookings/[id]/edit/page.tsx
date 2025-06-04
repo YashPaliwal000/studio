@@ -5,7 +5,7 @@ import type { BookingFormValues } from '@/components/bookings/BookingForm';
 import { useBookings } from '@/hooks/useBookings';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import type { Booking } from '@/lib/types';
+import type { Booking, RoomPrice } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ export default function EditBookingPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { getBookingById, updateBooking } = useBookings();
-  const [initialDataForForm, setInitialDataForForm] = useState<Partial<BookingFormValues> | undefined>(undefined);
+  const [initialDataForForm, setInitialDataForForm] = useState<Partial<BookingFormValues & { roomPrices?: RoomPrice[] } > | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,13 +24,15 @@ export default function EditBookingPage() {
       const booking = getBookingById(id as string);
       if (booking) {
         const { totalAmount, createdAt, updatedAt, ...formData } = booking;
-        setInitialDataForForm({
+         const formValues: Partial<BookingFormValues & { roomPrices?: RoomPrice[] }> = {
           ...formData,
-          roomNumbers: booking.roomNumbers, // Ensure this is passed as an array
+          roomNumbers: booking.roomNumbers,
           checkInDate: new Date(booking.checkInDate),
           checkOutDate: new Date(booking.checkOutDate),
-          pricePerNight: booking.pricePerNight,
-        });
+          roomPriceDetails: booking.roomPrices.map(rp => ({ roomNumber: rp.roomNumber, price: rp.price })), // for the form
+          roomPrices: booking.roomPrices, // for initialData prop consistency
+        };
+        setInitialDataForForm(formValues);
       } else {
         setError('Booking not found.');
       }
@@ -48,16 +50,28 @@ export default function EditBookingPage() {
      if (nights <= 0) {
       nights = 1;
     }
-    const numberOfSelectedRooms = data.roomNumbers.length;
-    const totalAmount = data.pricePerNight * nights * numberOfSelectedRooms;
+
+    const roomPrices: RoomPrice[] = data.roomPriceDetails.map(rpd => ({
+      roomNumber: rpd.roomNumber,
+      price: rpd.price,
+    }));
+    
+    const totalAmount = roomPrices.reduce((sum, room) => {
+      return sum + (room.price * nights);
+    }, 0);
 
     const bookingDataToUpdate: Partial<Omit<Booking, 'id' | 'createdAt'>> = {
-        ...data,
+        guestName: data.guestName,
+        guestContact: data.guestContact,
         roomNumbers: data.roomNumbers,
         checkInDate: checkIn,
         checkOutDate: checkOut,
-        pricePerNight: data.pricePerNight,
+        numberOfGuests: data.numberOfGuests,
+        roomPrices: roomPrices,
         totalAmount: totalAmount,
+        status: data.status,
+        bookingSource: data.bookingSource,
+        notes: data.notes,
       };
     return updateBooking(id as string, bookingDataToUpdate);
   };
@@ -69,7 +83,7 @@ export default function EditBookingPage() {
           <Skeleton className="h-8 w-1/2" />
         </CardHeader>
         <CardContent className="space-y-6">
-          {[...Array(7)].map((_, i) => ( // Increased skeleton items for roomNumbers and pricePerNight
+          {[...Array(8)].map((_, i) => ( 
             <div key={i} className="space-y-2">
               <Skeleton className="h-4 w-1/4" />
               <Skeleton className="h-10 w-full" />

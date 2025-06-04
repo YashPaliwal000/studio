@@ -1,6 +1,6 @@
 
 'use client';
-import type { Booking } from '@/lib/types';
+import type { Booking, RoomPrice } from '@/lib/types';
 import { APP_NAME } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -18,12 +18,7 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
     window.print();
   };
 
-  const nights = differenceInDays(new Date(booking.checkOutDate), new Date(booking.checkInDate)) || 1; // Ensure nights is at least 1
-  const numberOfRooms = booking.roomNumbers.length;
-  // pricePerNight is per room
-  const displayPricePerNight = booking.pricePerNight > 0 ? booking.pricePerNight : (nights > 0 && numberOfRooms > 0 ? booking.totalAmount / nights / numberOfRooms : booking.totalAmount);
-  const lineItemTotal = booking.pricePerNight * nights * numberOfRooms;
-
+  const nights = differenceInDays(new Date(booking.checkOutDate), new Date(booking.checkInDate)) || 1;
 
   return (
     <Card className="max-w-3xl mx-auto shadow-xl print:shadow-none print:border-none">
@@ -52,6 +47,7 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
             <p><strong>Check-in:</strong> {format(new Date(booking.checkInDate), 'PPP')}</p>
             <p><strong>Check-out:</strong> {format(new Date(booking.checkOutDate), 'PPP')}</p>
             <p><strong>Guests:</strong> {booking.numberOfGuests}</p>
+            <p><strong>Nights:</strong> {nights}</p>
           </div>
         </div>
 
@@ -64,31 +60,29 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
                   <thead>
                     <tr className="border-b border-muted">
                       <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-foreground sm:pl-6">Description</th>
-                      <th scope="col" className="hidden px-3 py-3.5 text-right text-sm font-semibold text-foreground sm:table-cell">Rooms</th>
-                      <th scope="col" className="hidden px-3 py-3.5 text-right text-sm font-semibold text-foreground sm:table-cell">Nights</th>
-                      <th scope="col" className="hidden px-3 py-3.5 text-right text-sm font-semibold text-foreground sm:table-cell">Price/Room/Night</th>
+                      <th scope="col" className="hidden px-3 py-3.5 text-right text-sm font-semibold text-foreground sm:table-cell">Price/Night</th>
                       <th scope="col" className="py-3.5 pl-3 pr-4 text-right text-sm font-semibold text-foreground sm:pr-6">Amount</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className="border-b border-muted">
-                      <td className="py-4 pl-4 pr-3 text-sm sm:pl-6">
-                        <p className="font-medium text-foreground">Stay at {appName} - Rooms {booking.roomNumbers.join(', ')}</p>
-                        <p className="text-muted-foreground">{format(new Date(booking.checkInDate), 'MMM d, yyyy')} - {format(new Date(booking.checkOutDate), 'MMM d, yyyy')}</p>
-                      </td>
-                      <td className="hidden px-3 py-4 text-right text-sm text-muted-foreground sm:table-cell">{numberOfRooms}</td>
-                      <td className="hidden px-3 py-4 text-right text-sm text-muted-foreground sm:table-cell">{nights > 0 ? nights : 1}</td>
-                      <td className="hidden px-3 py-4 text-right text-sm text-muted-foreground sm:table-cell">
-                        <span className="inline-flex items-center"><IndianRupee className="h-3.5 w-3.5 mr-0.5" />{booking.pricePerNight.toFixed(2)}</span>
-                      </td>
-                      <td className="py-4 pl-3 pr-4 text-right text-sm font-medium text-foreground sm:pr-6">
-                        <span className="inline-flex items-center"><IndianRupee className="h-3.5 w-3.5 mr-0.5" />{booking.totalAmount.toFixed(2)}</span>
-                      </td>
-                    </tr>
+                    {booking.roomPrices.map((roomPrice, index) => (
+                      <tr key={index} className="border-b border-muted">
+                        <td className="py-4 pl-4 pr-3 text-sm sm:pl-6">
+                          <p className="font-medium text-foreground">Room {roomPrice.roomNumber} ({nights} night{nights > 1 ? 's' : ''})</p>
+                          <p className="text-muted-foreground">{format(new Date(booking.checkInDate), 'MMM d')} - {format(new Date(booking.checkOutDate), 'MMM d, yyyy')}</p>
+                        </td>
+                        <td className="hidden px-3 py-4 text-right text-sm text-muted-foreground sm:table-cell">
+                          <span className="inline-flex items-center"><IndianRupee className="h-3.5 w-3.5 mr-0.5" />{roomPrice.price.toFixed(2)}</span>
+                        </td>
+                        <td className="py-4 pl-3 pr-4 text-right text-sm font-medium text-foreground sm:pr-6">
+                          <span className="inline-flex items-center"><IndianRupee className="h-3.5 w-3.5 mr-0.5" />{(roomPrice.price * nights).toFixed(2)}</span>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                   <tfoot>
                     <tr>
-                      <th scope="row" colSpan={4} className="hidden pt-4 pl-6 pr-3 text-right text-sm font-semibold text-foreground sm:table-cell sm:pl-0">
+                      <th scope="row" colSpan={2} className="hidden pt-4 pl-6 pr-3 text-right text-sm font-semibold text-foreground sm:table-cell sm:pl-0">
                         Total
                       </th>
                       <th scope="row" className="pt-4 pl-4 pr-3 text-left text-sm font-semibold text-foreground sm:hidden">

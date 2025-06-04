@@ -1,7 +1,7 @@
 
 'use client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { Booking } from '@/lib/types';
+import type { Booking, RoomPrice } from '@/lib/types'; // Import RoomPrice
 import { MAX_ROOMS } from '@/lib/constants';
 import { IndianRupee, Percent, TrendingUp, Users } from 'lucide-react';
 import { useMemo } from 'react';
@@ -19,10 +19,9 @@ export default function RevenueStats({ bookings }: RevenueStatsProps) {
 
     const totalRevenue = relevantBookings.reduce((sum, b) => sum + b.totalAmount, 0);
     
-    // Occupancy calculations for the last 30 days
-    const periodStart = startOfDay(subDays(today, 29)); // Start of 30 days ago
-    const periodEnd = startOfDay(today); // Start of today (to include full days)
-    const daysInPeriod = differenceInDays(periodEnd, periodStart) + 1; // +1 to include both start and end day
+    const periodStart = startOfDay(subDays(today, 29)); 
+    const periodEnd = startOfDay(today); 
+    const daysInPeriod = differenceInDays(periodEnd, periodStart) + 1;
     const totalPossibleRoomNightsInPeriod = MAX_ROOMS * daysInPeriod;
 
     let occupiedRoomNightsInPeriod = 0;
@@ -30,15 +29,14 @@ export default function RevenueStats({ bookings }: RevenueStatsProps) {
 
     relevantBookings.forEach(b => {
       const bookingStart = startOfDay(new Date(b.checkInDate));
-      const bookingEnd = startOfDay(new Date(b.checkOutDate)); // Use start of checkout for exclusive end
+      const bookingEnd = startOfDay(new Date(b.checkOutDate)); 
 
-      // Iterate over each day in the booking period
-      if (bookingEnd > bookingStart) { // Ensure valid booking period
-        const bookingDays = eachDayOfInterval({ start: bookingStart, end: subDays(bookingEnd,1) }); // Days guest stays
+      if (bookingEnd > bookingStart) { 
+        const bookingDays = eachDayOfInterval({ start: bookingStart, end: subDays(bookingEnd,1) }); 
         
         bookingDays.forEach(dayOfStay => {
           if (isWithinInterval(dayOfStay, interval)) {
-            occupiedRoomNightsInPeriod += b.roomNumbers.length; // Add number of rooms booked for that day
+            occupiedRoomNightsInPeriod += b.roomNumbers.length; 
           }
         });
       }

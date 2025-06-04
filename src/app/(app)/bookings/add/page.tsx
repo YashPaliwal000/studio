@@ -3,7 +3,7 @@
 import BookingForm from '@/components/bookings/BookingForm';
 import type { BookingFormValues } from '@/components/bookings/BookingForm';
 import { useBookings } from '@/hooks/useBookings';
-import type { Booking } from '@/lib/types';
+import type { Booking, RoomPrice } from '@/lib/types';
 import { differenceInDays } from 'date-fns';
 
 export default function AddBookingPage() {
@@ -18,16 +18,27 @@ export default function AddBookingPage() {
       nights = 1; 
     }
     
-    const numberOfSelectedRooms = data.roomNumbers.length;
-    const totalAmount = data.pricePerNight * nights * numberOfSelectedRooms;
+    const roomPrices: RoomPrice[] = data.roomPriceDetails.map(rpd => ({
+      roomNumber: rpd.roomNumber,
+      price: rpd.price,
+    }));
+
+    const totalAmount = roomPrices.reduce((sum, room) => {
+      return sum + (room.price * nights);
+    }, 0);
 
     const bookingDataToSave: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'> = {
-      ...data,
-      roomNumbers: data.roomNumbers, // Ensure this is passed
+      guestName: data.guestName,
+      guestContact: data.guestContact,
+      roomNumbers: data.roomNumbers,
       checkInDate: checkIn,
       checkOutDate: checkOut,
-      pricePerNight: data.pricePerNight,
+      numberOfGuests: data.numberOfGuests,
+      roomPrices: roomPrices,
       totalAmount: totalAmount,
+      status: data.status,
+      bookingSource: data.bookingSource,
+      notes: data.notes,
     };
     
     return addBooking(bookingDataToSave);
