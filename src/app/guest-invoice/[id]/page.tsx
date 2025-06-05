@@ -51,10 +51,11 @@ export default function GuestInvoicePage() {
             checkOutDate: new Date(data.checkOutDate),
             createdAt: new Date(data.createdAt),
             updatedAt: data.updatedAt ? new Date(data.updatedAt) : undefined,
+            advancePayment: data.advancePayment || 0,
+            discount: data.discount || 0,
           };
           setBooking(parsedBooking);
 
-          // Set document title for PDF saving
           const today = new Date();
           const formattedDate = format(today, 'yyyy-MM-dd');
           const invoiceIdSuffix = parsedBooking.id.substring(0, 8).toUpperCase();
@@ -73,7 +74,6 @@ export default function GuestInvoicePage() {
       setError('No booking ID provided.');
       setLoading(false);
     }
-     // Cleanup: restore original title when component unmounts
     return () => {
       if (typeof document !== 'undefined' && originalTitle) {
         document.title = originalTitle;
@@ -118,7 +118,7 @@ export default function GuestInvoicePage() {
                 <Skeleton className="h-8 w-full" />
             </div>
              <div className="mt-6 flex justify-end">
-                <Skeleton className="h-8 w-1/4" />
+                <Skeleton className="h-10 w-1/3" /> 
             </div>
           </CardContent>
           <CardFooter className="p-6 sm:p-8 md:p-10 flex justify-center">
@@ -141,7 +141,6 @@ export default function GuestInvoicePage() {
   }
 
   if (!booking) {
-    // This case should ideally be covered by the error state from fetch
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center">
         <p className="text-xl">Invoice data could not be loaded.</p>
@@ -150,7 +149,10 @@ export default function GuestInvoicePage() {
   }
 
   const nights = differenceInDays(new Date(booking.checkOutDate), new Date(booking.checkInDate)) || 1;
-  const totalExtraItemsCost = booking.extraItems?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0;
+  const discountAmount = booking.discount || 0;
+  const advancePaymentAmount = booking.advancePayment || 0;
+  const subtotalAfterDiscount = booking.totalAmount - discountAmount;
+  const balanceDue = subtotalAfterDiscount - advancePaymentAmount;
 
   return (
     <div className="min-h-screen bg-background py-8 px-2 sm:px-4 md:px-6 print:py-0 print:bg-transparent">
@@ -237,18 +239,66 @@ export default function GuestInvoicePage() {
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot>
+                     <tfoot>
                       <tr>
-                        <th scope="row" colSpan={3} className="hidden pt-4 pl-6 pr-3 text-right text-sm font-semibold text-foreground sm:table-cell sm:pl-0">
-                          Total
+                        <th scope="row" colSpan={3} className="hidden pt-4 pl-6 pr-3 text-right text-sm font-normal text-muted-foreground sm:table-cell sm:pl-0">
+                          Subtotal
                         </th>
-                        <th scope="row" className="pt-4 pl-4 pr-3 text-left text-sm font-semibold text-foreground sm:hidden">
-                          Total
+                        <th scope="row" className="pt-4 pl-4 pr-3 text-left text-sm font-normal text-muted-foreground sm:hidden">
+                          Subtotal
                         </th>
-                        <td className="pt-4 pl-3 pr-4 text-right text-sm font-semibold text-foreground sm:pr-6">
-                           Rs. {booking.totalAmount.toFixed(2)}
+                        <td className="pt-4 pl-3 pr-4 text-right text-sm text-muted-foreground sm:pr-6">
+                          Rs. {booking.totalAmount.toFixed(2)}
                         </td>
                       </tr>
+                      {discountAmount > 0 && (
+                        <tr>
+                          <th scope="row" colSpan={3} className="hidden pt-1 pl-6 pr-3 text-right text-sm font-normal text-muted-foreground sm:table-cell sm:pl-0">
+                            Discount
+                          </th>
+                          <th scope="row" className="pt-1 pl-4 pr-3 text-left text-sm font-normal text-muted-foreground sm:hidden">
+                            Discount
+                          </th>
+                          <td className="pt-1 pl-3 pr-4 text-right text-sm text-muted-foreground sm:pr-6">
+                            - Rs. {discountAmount.toFixed(2)}
+                          </td>
+                        </tr>
+                      )}
+                       <tr>
+                          <th scope="row" colSpan={3} className="hidden pt-1 pl-6 pr-3 text-right text-sm font-semibold text-foreground sm:table-cell sm:pl-0">
+                            {discountAmount > 0 ? 'Total After Discount' : 'Total'}
+                          </th>
+                          <th scope="row" className="pt-1 pl-4 pr-3 text-left text-sm font-semibold text-foreground sm:hidden">
+                            {discountAmount > 0 ? 'Total After Discount' : 'Total'}
+                          </th>
+                          <td className="pt-1 pl-3 pr-4 text-right text-sm font-semibold text-foreground sm:pr-6">
+                            Rs. {subtotalAfterDiscount.toFixed(2)}
+                          </td>
+                        </tr>
+                      {advancePaymentAmount > 0 && (
+                        <tr>
+                          <th scope="row" colSpan={3} className="hidden pt-1 pl-6 pr-3 text-right text-sm font-normal text-muted-foreground sm:table-cell sm:pl-0">
+                            Advance Paid
+                          </th>
+                          <th scope="row" className="pt-1 pl-4 pr-3 text-left text-sm font-normal text-muted-foreground sm:hidden">
+                            Advance Paid
+                          </th>
+                          <td className="pt-1 pl-3 pr-4 text-right text-sm text-muted-foreground sm:pr-6">
+                            - Rs. {advancePaymentAmount.toFixed(2)}
+                          </td>
+                        </tr>
+                      )}
+                      <tr className="border-t border-primary/50">
+                          <th scope="row" colSpan={3} className="hidden pt-2 pl-6 pr-3 text-right text-lg font-bold text-primary sm:table-cell sm:pl-0">
+                            Balance Due
+                          </th>
+                          <th scope="row" className="pt-2 pl-4 pr-3 text-left text-lg font-bold text-primary sm:hidden">
+                            Balance Due
+                          </th>
+                          <td className="pt-2 pl-3 pr-4 text-right text-lg font-bold text-primary sm:pr-6">
+                            Rs. {balanceDue.toFixed(2)}
+                          </td>
+                        </tr>
                     </tfoot>
                   </table>
                 </div>

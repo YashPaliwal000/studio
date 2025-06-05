@@ -30,13 +30,14 @@ import type { Booking, BookingStatus, BookingSource, RoomPrice, ExtraItem } from
 import { ROOM_CONFIG, BOOKING_STATUSES, BOOKING_SOURCES } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo } from 'react';
-import { InfoIcon, PlusCircle, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { InfoIcon, PlusCircle, Trash2, CircleDollarSign } from 'lucide-react';
 import { useBookings } from '@/hooks/useBookings';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { nanoid } from 'nanoid';
 import { Separator } from '../ui/separator';
+import { differenceInDays } from 'date-fns';
 
 
 const roomPriceDetailSchema = z.object({
@@ -61,6 +62,8 @@ const bookingFormSchema = z.object({
   numberOfGuests: z.coerce.number().min(1, { message: 'At least one guest is required.' }),
   roomPriceDetails: z.array(roomPriceDetailSchema).min(1, { message: 'Price for selected rooms must be provided.' }),
   extraItems: z.array(extraItemSchema).optional(),
+  advancePayment: z.coerce.number().min(0, { message: "Advance payment cannot be negative."}).optional(),
+  discount: z.coerce.number().min(0, { message: "Discount cannot be negative."}).optional(),
   status: z.enum(BOOKING_STATUSES),
   bookingSource: z.enum(BOOKING_SOURCES).optional(),
   notes: z.string().optional(),
@@ -90,6 +93,8 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
   const { toast } = useToast();
   const router = useRouter();
   const { bookings: allBookings, loading: bookingsLoading } = useBookings();
+  const [calculatedTotalAmount, setCalculatedTotalAmount] = useState(0);
+  const [balanceDue, setBalanceDue] = useState(0);
 
   const getDefaultPriceForRoom = (roomId: number) => {
     const room = ROOM_CONFIG.find(r => r.id === roomId);
@@ -106,6 +111,8 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
         roomPriceDetails: initialData.roomPrices?.map(rp => ({ roomNumber: rp.roomNumber, price: rp.price })) ||
                           initialData.roomNumbers?.map(rn => ({ roomNumber: rn, price: getDefaultPriceForRoom(rn) })) || [],
         extraItems: initialData.extraItems?.map(ei => ({ ...ei, id: ei.id || nanoid() })) || [],
+        advancePayment: initialData.advancePayment || 0,
+        discount: initialData.discount || 0,
       } : {
       guestName: '',
       guestContact: '',
@@ -113,6 +120,8 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
       numberOfGuests: 1,
       roomPriceDetails: [],
       extraItems: [],
+      advancePayment: 0,
+      discount: 0,
       status: 'Confirmed',
       notes: '',
     },
@@ -129,11 +138,42 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
   });
 
   const selectedRoomNumbersInForm = form.watch('roomNumbers');
-  const checkInDate = form.watch('checkInDate');
-  const checkOutDate = form.watch('checkOutDate');
+  const watchedCheckInDate = form.watch('checkInDate');
+  const watchedCheckOutDate = form.watch('checkOutDate');
+  const watchedRoomPriceDetails = form.watch('roomPriceDetails');
+  const watchedExtraItems = form.watch('extraItems');
+  const watchedAdvancePayment = form.watch('advancePayment');
+  const watchedDiscount = form.watch('discount');
+
+  useEffect(() => {
+    if (!watchedCheckInDate || !watchedCheckOutDate) {
+      setCalculatedTotalAmount(0);
+      return;
+    }
+    let nights = differenceInDays(watchedCheckOutDate, watchedCheckInDate);
+    if (nights <= 0) nights = 1;
+
+    const totalRoomAmount = watchedRoomPriceDetails.reduce((sum, room) => {
+      return sum + (room.price * nights);
+    }, 0);
+
+    const totalExtraItemsAmount = (watchedExtraItems || []).reduce((sum, item) => {
+        return sum + (item.price * item.quantity);
+    }, 0);
+    
+    setCalculatedTotalAmount(totalRoomAmount + totalExtraItemsAmount);
+
+  }, [watchedCheckInDate, watchedCheckOutDate, watchedRoomPriceDetails, watchedExtraItems]);
+
+  useEffect(() => {
+    const currentDiscount = watchedDiscount || 0;
+    const currentAdvance = watchedAdvancePayment || 0;
+    setBalanceDue(calculatedTotalAmount - currentDiscount - currentAdvance);
+  }, [calculatedTotalAmount, watchedDiscount, watchedAdvancePayment]);
+
 
   const conflictingRooms = useMemo(() => {
-    if (!checkInDate || !checkOutDate || bookingsLoading || !allBookings) return new Set<number>();
+    if (!watchedCheckInDate || !watchedCheckOutDate || bookingsLoading || !allBookings) return new Set<number>();
     const conflicts = new Set<number>();
 
     for (const booking of allBookings) {
@@ -143,16 +183,16 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
       const existingCheckIn = new Date(booking.checkInDate);
       const existingCheckOut = new Date(booking.checkOutDate);
 
-      if (checkInDate < existingCheckOut && checkOutDate > existingCheckIn) {
+      if (watchedCheckInDate < existingCheckOut && watchedCheckOutDate > existingCheckIn) {
         booking.roomNumbers.forEach(rn => conflicts.add(rn));
       }
     }
     return conflicts;
-  }, [allBookings, bookingsLoading, checkInDate, checkOutDate, currentBookingId]);
+  }, [allBookings, bookingsLoading, watchedCheckInDate, watchedCheckOutDate, currentBookingId]);
 
 
   useEffect(() => {
-    if (bookingsLoading || !allBookings || !checkInDate || !checkOutDate) return;
+    if (bookingsLoading || !allBookings || !watchedCheckInDate || !watchedCheckOutDate) return;
 
     const currentlySelectedRooms = form.getValues('roomNumbers') || [];
     const stillAvailableSelectedRooms = currentlySelectedRooms.filter(roomNum => !conflictingRooms.has(roomNum));
@@ -165,7 +205,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
           variant: "default",
       });
     }
-  }, [conflictingRooms, allBookings, bookingsLoading, checkInDate, checkOutDate, form, toast]);
+  }, [conflictingRooms, allBookings, bookingsLoading, watchedCheckInDate, watchedCheckOutDate, form, toast]);
 
 
   useEffect(() => {
@@ -477,6 +517,56 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
             
             <Separator />
 
+            <div className="space-y-4 p-4 border rounded-md bg-muted/20">
+                <h3 className="text-lg font-medium flex items-center gap-2"><CircleDollarSign className="h-5 w-5 text-primary" />Payment Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField
+                        control={form.control}
+                        name="discount"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Discount</FormLabel>
+                            <FormControl>
+                                <div className="relative w-full">
+                                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">Rs.</span>
+                                <Input type="number" placeholder="Enter discount amount" {...field} className="pl-10" />
+                                </div>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="advancePayment"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Advance Payment Received</FormLabel>
+                            <FormControl>
+                                <div className="relative w-full">
+                                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">Rs.</span>
+                                <Input type="number" placeholder="Enter advance payment" {...field} className="pl-10" />
+                                </div>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
+                 <Separator className="my-3 bg-border/70"/>
+                 <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p className="text-muted-foreground">Calculated Gross Total:</p>
+                        <p className="font-semibold text-lg">Rs. {calculatedTotalAmount.toFixed(2)}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-muted-foreground">Balance Due:</p>
+                        <p className="font-bold text-xl text-primary">Rs. {balanceDue.toFixed(2)}</p>
+                    </div>
+                </div>
+            </div>
+
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
@@ -552,4 +642,3 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
     </Card>
   );
 }
-

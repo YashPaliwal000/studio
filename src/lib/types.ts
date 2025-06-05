@@ -24,8 +24,10 @@ export interface Booking {
   checkOutDate: Date;
   numberOfGuests: number;
   roomPrices: RoomPrice[];
-  extraItems?: ExtraItem[]; // Added
-  totalAmount: number;
+  extraItems?: ExtraItem[];
+  totalAmount: number; // Gross total before discount and advance
+  advancePayment?: number;
+  discount?: number;
   status: BookingStatus;
   bookingSource?: BookingSource;
   notes?: string;

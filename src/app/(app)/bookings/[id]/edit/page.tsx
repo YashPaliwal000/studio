@@ -28,7 +28,7 @@ export default function EditBookingPage() {
     if (id) {
       const booking = getBookingById(id as string);
       if (booking) {
-        const { totalAmount, createdAt, updatedAt, ...formData } = booking;
+        const { totalAmount, createdAt, updatedAt, ...formData } = booking; // totalAmount is gross
          const formValues: Partial<BookingFormValues & { id: string; roomPrices?: RoomPrice[]; extraItems?: ExtraItem[] }> = {
           ...formData,
           id: booking.id, 
@@ -37,7 +37,9 @@ export default function EditBookingPage() {
           checkOutDate: new Date(booking.checkOutDate),
           roomPriceDetails: booking.roomPrices.map(rp => ({ roomNumber: rp.roomNumber, price: rp.price })),
           extraItems: booking.extraItems?.map(ei => ({ ...ei, id: ei.id || nanoid() })) || [],
-          roomPrices: booking.roomPrices, // keep original roomPrices for BookingForm initialData
+          roomPrices: booking.roomPrices, 
+          advancePayment: booking.advancePayment || 0,
+          discount: booking.discount || 0,
         };
         setInitialDataForForm(formValues);
       } else {
@@ -99,7 +101,7 @@ export default function EditBookingPage() {
         return sum + (item.price * item.quantity);
     }, 0);
     
-    const totalAmount = totalRoomAmount + totalExtraItemsAmount;
+    const grossTotalAmount = totalRoomAmount + totalExtraItemsAmount;
 
     const bookingDataToUpdate: Partial<Omit<Booking, 'id' | 'createdAt'>> = {
         guestName: data.guestName,
@@ -110,7 +112,9 @@ export default function EditBookingPage() {
         numberOfGuests: data.numberOfGuests,
         roomPrices: roomPrices,
         extraItems: extraItemsToSave,
-        totalAmount: totalAmount,
+        totalAmount: grossTotalAmount, // This is the gross total
+        advancePayment: data.advancePayment || 0,
+        discount: data.discount || 0,
         status: data.status,
         bookingSource: data.bookingSource,
         notes: data.notes,
@@ -125,7 +129,7 @@ export default function EditBookingPage() {
           <Skeleton className="h-8 w-1/2" />
         </CardHeader>
         <CardContent className="space-y-6">
-          {[...Array(10)].map((_, i) => ( 
+          {[...Array(12)].map((_, i) => ( 
             <div key={i} className="space-y-2">
               <Skeleton className="h-4 w-1/4" />
               <Skeleton className="h-10 w-full" />
