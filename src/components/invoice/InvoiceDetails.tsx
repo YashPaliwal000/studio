@@ -39,9 +39,13 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
   };
 
   const nights = differenceInDays(new Date(booking.checkOutDate), new Date(booking.checkInDate)) || 1;
+  const discount = booking.discount || 0;
+  const advancePayment = booking.advancePayment || 0;
+  const subtotalAfterDiscount = booking.totalAmount - discount;
+  const balanceDue = subtotalAfterDiscount - advancePayment;
+
 
   const handleShareOnWhatsApp = () => {
-    // Construct the public invoice link
     const publicInvoiceLink = typeof window !== 'undefined' 
       ? `${window.location.origin}/guest-invoice/${booking.id}`
       : ''; 
@@ -52,15 +56,12 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
     message += `Booking Details:\n`;
     message += `Check-in: ${format(new Date(booking.checkInDate), 'PPP')}\n`;
     message += `Check-out: ${format(new Date(booking.checkOutDate), 'PPP')}\n`;
-    message += `Total Amount: Rs. ${booking.totalAmount.toFixed(2)}\n\n`;
+    message += `Balance Due: Rs. ${balanceDue.toFixed(2)}\n\n`;
     message += `We hope you enjoyed your stay!`;
 
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
-
-  const totalExtraItemsCost = booking.extraItems?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0;
-  const totalRoomCost = booking.totalAmount - totalExtraItemsCost;
 
 
   return (
@@ -149,16 +150,64 @@ export default function InvoiceDetails({ booking, appName }: InvoiceDetailsProps
                   </tbody>
                   <tfoot>
                     <tr>
-                      <th scope="row" colSpan={3} className="hidden pt-4 pl-6 pr-3 text-right text-sm font-semibold text-foreground sm:table-cell sm:pl-0">
-                        Total
+                      <th scope="row" colSpan={3} className="hidden pt-4 pl-6 pr-3 text-right text-sm font-normal text-muted-foreground sm:table-cell sm:pl-0">
+                        Subtotal
                       </th>
-                      <th scope="row" className="pt-4 pl-4 pr-3 text-left text-sm font-semibold text-foreground sm:hidden">
-                        Total
+                      <th scope="row" className="pt-4 pl-4 pr-3 text-left text-sm font-normal text-muted-foreground sm:hidden">
+                        Subtotal
                       </th>
-                      <td className="pt-4 pl-3 pr-4 text-right text-sm font-semibold text-foreground sm:pr-6">
+                      <td className="pt-4 pl-3 pr-4 text-right text-sm text-muted-foreground sm:pr-6">
                          Rs. {booking.totalAmount.toFixed(2)}
                       </td>
                     </tr>
+                    {discount > 0 && (
+                      <tr>
+                        <th scope="row" colSpan={3} className="hidden pt-1 pl-6 pr-3 text-right text-sm font-normal text-muted-foreground sm:table-cell sm:pl-0">
+                          Discount
+                        </th>
+                        <th scope="row" className="pt-1 pl-4 pr-3 text-left text-sm font-normal text-muted-foreground sm:hidden">
+                          Discount
+                        </th>
+                        <td className="pt-1 pl-3 pr-4 text-right text-sm text-muted-foreground sm:pr-6">
+                          - Rs. {discount.toFixed(2)}
+                        </td>
+                      </tr>
+                    )}
+                     <tr>
+                        <th scope="row" colSpan={3} className="hidden pt-1 pl-6 pr-3 text-right text-sm font-semibold text-foreground sm:table-cell sm:pl-0">
+                          {discount > 0 ? 'Total After Discount' : 'Total'}
+                        </th>
+                        <th scope="row" className="pt-1 pl-4 pr-3 text-left text-sm font-semibold text-foreground sm:hidden">
+                           {discount > 0 ? 'Total After Discount' : 'Total'}
+                        </th>
+                        <td className="pt-1 pl-3 pr-4 text-right text-sm font-semibold text-foreground sm:pr-6">
+                           Rs. {subtotalAfterDiscount.toFixed(2)}
+                        </td>
+                      </tr>
+                    {advancePayment > 0 && (
+                      <tr>
+                        <th scope="row" colSpan={3} className="hidden pt-1 pl-6 pr-3 text-right text-sm font-normal text-muted-foreground sm:table-cell sm:pl-0">
+                          Advance Paid
+                        </th>
+                        <th scope="row" className="pt-1 pl-4 pr-3 text-left text-sm font-normal text-muted-foreground sm:hidden">
+                          Advance Paid
+                        </th>
+                        <td className="pt-1 pl-3 pr-4 text-right text-sm text-muted-foreground sm:pr-6">
+                          - Rs. {advancePayment.toFixed(2)}
+                        </td>
+                      </tr>
+                    )}
+                    <tr className="border-t border-primary/50">
+                        <th scope="row" colSpan={3} className="hidden pt-2 pl-6 pr-3 text-right text-lg font-bold text-primary sm:table-cell sm:pl-0">
+                          Balance Due
+                        </th>
+                        <th scope="row" className="pt-2 pl-4 pr-3 text-left text-lg font-bold text-primary sm:hidden">
+                          Balance Due
+                        </th>
+                        <td className="pt-2 pl-3 pr-4 text-right text-lg font-bold text-primary sm:pr-6">
+                           Rs. {balanceDue.toFixed(2)}
+                        </td>
+                      </tr>
                   </tfoot>
                 </table>
               </div>

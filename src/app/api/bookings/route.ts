@@ -16,7 +16,7 @@ const calculateNights = (checkIn: Date | string, checkOut: Date | string): numbe
   return nights > 0 ? nights : 1;
 };
 
-const calculateTotalAmount = (booking: Omit<Booking, 'totalAmount' | 'id' | 'createdAt'>): number => {
+const calculateGrossTotalAmount = (booking: Omit<Booking, 'totalAmount' | 'id' | 'createdAt' | 'updatedAt' | 'advancePayment' | 'discount'>): number => {
     const nights = calculateNights(booking.checkInDate, booking.checkOutDate);
     const roomTotal = booking.roomPrices.reduce((sum, rp) => sum + (rp.price * nights), 0);
     const extraItemsTotal = (booking.extraItems || []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -37,14 +37,13 @@ async function ensureDataFileExists(): Promise<Booking[]> {
     return bookingsFromFile.map(b => {
       const nights = calculateNights(b.checkInDate, b.checkOutDate);
       
-      // Ensure roomPrices exists and is an array
       if (!Array.isArray(b.roomPrices)) {
-        if (b.pricePerNight && Array.isArray(b.roomNumbers)) { // Old data with pricePerNight
+        if (b.pricePerNight && Array.isArray(b.roomNumbers)) { 
           b.roomPrices = b.roomNumbers.map((rn: number) => ({
             roomNumber: rn,
             price: b.pricePerNight,
           }));
-        } else { // Fallback if no price info at all
+        } else { 
            b.roomPrices = (b.roomNumbers || [ROOM_CONFIG[0].id]).map((rn: number) => {
               const roomConfig = ROOM_CONFIG.find(rc => rc.id === rn);
               return {
@@ -56,16 +55,17 @@ async function ensureDataFileExists(): Promise<Booking[]> {
         delete b.pricePerNight;
       }
       
-      // Ensure extraItems exists and is an array, and items have IDs
       b.extraItems = (Array.isArray(b.extraItems) ? b.extraItems : []).map((ei: any) => ({
         ...ei,
         id: ei.id || nanoid() 
       }));
 
-      // Recalculate totalAmount based on current structure
       const roomTotal = b.roomPrices.reduce((sum: number, rp: RoomPrice) => sum + (rp.price * nights), 0);
       const extraItemsTotal = b.extraItems.reduce((sum: number, item: ExtraItem) => sum + (item.price * item.quantity), 0);
-      b.totalAmount = roomTotal + extraItemsTotal;
+      b.totalAmount = roomTotal + extraItemsTotal; // Gross total
+      
+      b.advancePayment = typeof b.advancePayment === 'number' ? b.advancePayment : 0;
+      b.discount = typeof b.discount === 'number' ? b.discount : 0;
       
       return b as Booking;
     });
@@ -93,6 +93,8 @@ const getInitialBookingsForFile = (): Booking[] => {
       numberOfGuests: 2,
       roomPrices: [{ roomNumber: ROOM_CONFIG[0].id, price: ROOM_CONFIG[0].defaultPrice }],
       extraItems: [],
+      advancePayment: 500,
+      discount: 100,
       status: 'Confirmed',
       bookingSource: 'Online',
       createdAt: new Date(),
@@ -112,6 +114,8 @@ const getInitialBookingsForFile = (): Booking[] => {
       extraItems: [
         { id: nanoid(), name: "Extra Breakfast", price: 250, quantity: 2, unit: "plate" }
       ],
+      advancePayment: 0,
+      discount: 0,
       status: 'Confirmed',
       bookingSource: 'Phone',
       createdAt: new Date(),
@@ -119,8 +123,16 @@ const getInitialBookingsForFile = (): Booking[] => {
   ];
 
   return bookingsRaw.map(b => {
-    const totalAmount = calculateTotalAmount(b);
-    return { ...b, totalAmount, checkInDate: new Date(b.checkInDate).toISOString(), checkOutDate: new Date(b.checkOutDate).toISOString(), createdAt: new Date(b.createdAt).toISOString() } as Booking;
+    const totalAmount = calculateGrossTotalAmount(b); // Gross total
+    return { 
+        ...b, 
+        totalAmount, 
+        checkInDate: new Date(b.checkInDate).toISOString(), 
+        checkOutDate: new Date(b.checkOutDate).toISOString(), 
+        createdAt: new Date(b.createdAt).toISOString(),
+        advancePayment: b.advancePayment || 0,
+        discount: b.discount || 0,
+    } as Booking;
   });
 };
 
@@ -147,7 +159,6 @@ export async function POST(request: NextRequest) {
       
       const nights = calculateNights(bookingData.checkInDate, bookingData.checkOutDate);
       
-      // Ensure roomPrices format
       let currentRoomPrices = Array.isArray(bookingData.roomPrices) ? bookingData.roomPrices : [];
       if (currentRoomPrices.length === 0 && pricePerNight) {
          currentRoomPrices = (bookingData.roomNumbers || [ROOM_CONFIG[0].id]).map((rn: number) => ({
@@ -171,14 +182,16 @@ export async function POST(request: NextRequest) {
 
       const roomTotal = currentRoomPrices.reduce((sum: number, rp: RoomPrice) => sum + (rp.price * nights), 0);
       const extraItemsTotal = currentExtraItems.reduce((sum: number, item: ExtraItem) => sum + (item.price * item.quantity), 0);
-      const calculatedTotalAmount = roomTotal + extraItemsTotal;
+      const calculatedGrossTotalAmount = roomTotal + extraItemsTotal;
 
       return {
         ...bookingData,
         roomNumbers: Array.isArray(bookingData.roomNumbers) ? bookingData.roomNumbers : (typeof bookingData.roomNumber === 'number' ? [bookingData.roomNumber] : [ROOM_CONFIG[0].id]),
         roomPrices: currentRoomPrices,
         extraItems: currentExtraItems,
-        totalAmount: calculatedTotalAmount,
+        totalAmount: calculatedGrossTotalAmount, // Gross total
+        advancePayment: typeof bookingData.advancePayment === 'number' ? bookingData.advancePayment : 0,
+        discount: typeof bookingData.discount === 'number' ? bookingData.discount : 0,
         checkInDate: new Date(bookingData.checkInDate).toISOString(),
         checkOutDate: new Date(bookingData.checkOutDate).toISOString(),
         createdAt: new Date(bookingData.createdAt).toISOString(),

@@ -20,7 +20,9 @@
     "status": "Confirmed",
     "bookingSource": "Online",
     "createdAt": "2025-06-04T12:08:32.971Z",
-    "totalAmount": 6000
+    "totalAmount": 6000,
+    "advancePayment": 500,
+    "discount": 100
   },
   {
     "id": "init-bob-builder",
@@ -55,7 +57,9 @@
     "status": "Confirmed",
     "bookingSource": "Phone",
     "createdAt": "2025-06-04T12:08:32.971Z",
-    "totalAmount": 20000
+    "totalAmount": 20000,
+    "advancePayment": 0,
+    "discount": 0
   },
   {
     "guestName": "Yash",
@@ -77,7 +81,9 @@
     "extraItems": [],
     "totalAmount": 3000,
     "id": "SROQwU15Bbleo2Q0F-TDp",
-    "createdAt": "2025-06-03T10:52:31.958Z"
+    "createdAt": "2025-06-03T10:52:31.958Z",
+    "advancePayment": 0,
+    "discount": 0
   },
   {
     "guestName": "Kamal",
@@ -113,6 +119,8 @@
     ],
     "totalAmount": 12600,
     "id": "1EmRRVcJdLJsdXvuHlWQ_",
-    "createdAt": "2025-06-04T07:41:25.000Z"
+    "createdAt": "2025-06-04T07:41:25.000Z",
+    "advancePayment": 2000,
+    "discount": 500
   }
 ]

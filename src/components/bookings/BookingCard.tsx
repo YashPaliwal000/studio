@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { Booking } from '@/lib/types';
 import { ROOM_CONFIG } from '@/lib/constants';
-import { Edit, Trash2, User, Phone, CalendarDays, BedDouble, Users, CheckCircle, Info, PackageOpen, FileText, ShoppingBag } from 'lucide-react';
+import { Edit, Trash2, User, Phone, CalendarDays, BedDouble, Users, CheckCircle, Info, PackageOpen, FileText, ShoppingBag, MinusCircle, ArrowDownCircle, TrendingUp } from 'lucide-react';
 
 interface BookingCardProps {
   booking: Booking;
@@ -29,12 +29,11 @@ const getRoomNames = (roomIds: number[]): string => {
 };
 
 export default function BookingCard({ booking, onDelete }: BookingCardProps) {
-  const averagePricePerNightPerRoom = booking.roomPrices.length > 0
-    ? booking.roomPrices.reduce((sum, rp) => sum + rp.price, 0) / booking.roomPrices.length
-    : 0;
-  
   const roomNames = getRoomNames(booking.roomNumbers);
   const hasExtraItems = booking.extraItems && booking.extraItems.length > 0;
+  const discount = booking.discount || 0;
+  const advancePayment = booking.advancePayment || 0;
+  const balanceDue = booking.totalAmount - discount - advancePayment;
 
   return (
     <Card className="shadow-lg hover:shadow-xl transition-shadow w-full flex flex-col">
@@ -47,17 +46,21 @@ export default function BookingCard({ booking, onDelete }: BookingCardProps) {
           <Badge className={`${statusColors[booking.status]} text-white`}>{booking.status}</Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm flex-grow">
+      <CardContent className="space-y-2 text-sm flex-grow">
         <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /> Guest Contact: {booking.guestContact}</div>
         <div className="flex items-center gap-2"><BedDouble className="h-4 w-4 text-muted-foreground" /> Rooms: {roomNames}</div>
         <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Check-in: {format(new Date(booking.checkInDate), 'PPP')}</div>
         <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Check-out: {format(new Date(booking.checkOutDate), 'PPP')}</div>
         <div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /> Guests: {booking.numberOfGuests}</div>
-        <div className="flex items-center gap-1">
-          {booking.roomPrices.length > 1 ? `Avg. Rs. ${averagePricePerNightPerRoom.toFixed(2)}/room/night | ` : (booking.roomPrices[0] ? `Price Rs. ${booking.roomPrices[0].price.toFixed(2)}/night | ` : '')}
-          Total: Rs. {booking.totalAmount.toFixed(2)}
+        
+        <div className="border-t pt-2 mt-2 space-y-1">
+            <div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-muted-foreground" /> Gross Total: Rs. {booking.totalAmount.toFixed(2)}</div>
+            {discount > 0 && <div className="flex items-center gap-2 text-orange-600"><MinusCircle className="h-4 w-4" /> Discount: Rs. {discount.toFixed(2)}</div>}
+            {advancePayment > 0 && <div className="flex items-center gap-2 text-green-600"><ArrowDownCircle className="h-4 w-4" /> Advance Paid: Rs. {advancePayment.toFixed(2)}</div>}
+            <div className="flex items-center gap-2 font-semibold text-primary"><CheckCircle className="h-4 w-4" /> Balance Due: Rs. {balanceDue.toFixed(2)}</div>
         </div>
-        {hasExtraItems && <div className="flex items-center gap-2 text-xs text-accent-foreground/80"><ShoppingBag className="h-3 w-3 text-accent" /> Includes extra items</div>}
+
+        {hasExtraItems && <div className="flex items-center gap-2 text-xs text-accent-foreground/80 pt-1"><ShoppingBag className="h-3 w-3 text-accent" /> Includes extra items</div>}
         {booking.bookingSource && <div className="flex items-center gap-2"><PackageOpen className="h-4 w-4 text-muted-foreground" /> Source: {booking.bookingSource}</div>}
         {booking.notes && <div className="flex items-start gap-2"><Info className="h-4 w-4 text-muted-foreground mt-1" /> Notes: <span className="italic">{booking.notes}</span></div>}
       </CardContent>

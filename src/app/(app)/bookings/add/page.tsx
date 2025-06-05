@@ -50,7 +50,7 @@ export default function AddBookingPage() {
     }, 0);
 
     const extraItemsToSave: ExtraItem[] = (data.extraItems || []).map(item => ({
-      id: item.id || nanoid(), // Ensure ID for items that might not have one from form
+      id: item.id || nanoid(), 
       name: item.name,
       price: item.price,
       quantity: item.quantity,
@@ -61,7 +61,7 @@ export default function AddBookingPage() {
         return sum + (item.price * item.quantity);
     }, 0);
 
-    const totalAmount = totalRoomAmount + totalExtraItemsAmount;
+    const grossTotalAmount = totalRoomAmount + totalExtraItemsAmount;
 
     const bookingDataToSave: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'> = {
       guestName: data.guestName,
@@ -72,7 +72,9 @@ export default function AddBookingPage() {
       numberOfGuests: data.numberOfGuests,
       roomPrices: roomPrices,
       extraItems: extraItemsToSave,
-      totalAmount: totalAmount,
+      totalAmount: grossTotalAmount, // This is the gross total
+      advancePayment: data.advancePayment || 0,
+      discount: data.discount || 0,
       status: data.status,
       bookingSource: data.bookingSource,
       notes: data.notes,
