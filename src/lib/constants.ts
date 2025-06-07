@@ -21,3 +21,5 @@ export const BOOKING_STATUSES: BookingStatus[] = ['Confirmed', 'CheckedIn', 'Che
 export const BOOKING_SOURCES: BookingSource[] = ['Online', 'Walk-in', 'Phone', 'Other'];
 
 export const APP_NAME = "Palis Nest";
+
+export const FULL_HOME_STAY_PRICE_PER_NIGHT = 15000;

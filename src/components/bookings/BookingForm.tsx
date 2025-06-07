@@ -27,11 +27,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import type { Booking, BookingStatus, BookingSource, RoomPrice, ExtraItem } from '@/lib/types';
-import { ROOM_CONFIG, BOOKING_STATUSES, BOOKING_SOURCES } from '@/lib/constants';
+import { ROOM_CONFIG, BOOKING_STATUSES, BOOKING_SOURCES, FULL_HOME_STAY_PRICE_PER_NIGHT } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { InfoIcon, PlusCircle, Trash2, CircleDollarSign } from 'lucide-react';
+import { InfoIcon, PlusCircle, Trash2, CircleDollarSign, Home } from 'lucide-react';
 import { useBookings } from '@/hooks/useBookings';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -95,6 +95,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
   const { bookings: allBookings, loading: bookingsLoading } = useBookings();
   const [calculatedTotalAmount, setCalculatedTotalAmount] = useState(0);
   const [balanceDue, setBalanceDue] = useState(0);
+  const [isFullHomeStaySelected, setIsFullHomeStaySelected] = useState(false);
 
   const getDefaultPriceForRoom = (roomId: number) => {
     const room = ROOM_CONFIG.find(r => r.id === roomId);
@@ -126,8 +127,21 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
       notes: '',
     },
   });
+   
+  useEffect(() => {
+    if (initialData?.roomNumbers && initialData.roomNumbers.length === ROOM_CONFIG.length) {
+      const totalInitialPrice = initialData.roomPrices?.reduce((sum, rp) => sum + rp.price, 0) || 0;
+      const expectedPackagePricePerRoom = ROOM_CONFIG.length > 0 ? FULL_HOME_STAY_PRICE_PER_NIGHT / ROOM_CONFIG.length : 0;
+      // Check if all rooms have the same distributed package price
+      const isLikelyFullHomeStay = initialData.roomPrices?.every(rp => Math.abs(rp.price - expectedPackagePricePerRoom) < 0.01);
+      if (isLikelyFullHomeStay) {
+        setIsFullHomeStaySelected(true);
+      }
+    }
+  }, [initialData]);
 
-  const { fields: roomPriceFields, append: appendRoomPrice, remove: removeRoomPrice } = useFieldArray({
+
+  const { fields: roomPriceFields, append: appendRoomPrice, remove: removeRoomPrice, replace: replaceRoomPrices } = useFieldArray({
     control: form.control,
     name: "roomPriceDetails",
   });
@@ -153,17 +167,22 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
     let nights = differenceInDays(watchedCheckOutDate, watchedCheckInDate);
     if (nights <= 0) nights = 1;
 
-    const totalRoomAmount = watchedRoomPriceDetails.reduce((sum, room) => {
-      return sum + (room.price * nights);
-    }, 0);
-
+    let totalRoomAmount = 0;
+    if (isFullHomeStaySelected) {
+        totalRoomAmount = FULL_HOME_STAY_PRICE_PER_NIGHT * nights;
+    } else {
+        totalRoomAmount = watchedRoomPriceDetails.reduce((sum, room) => {
+            return sum + (room.price * nights);
+        }, 0);
+    }
+    
     const totalExtraItemsAmount = (watchedExtraItems || []).reduce((sum, item) => {
         return sum + (item.price * item.quantity);
     }, 0);
     
     setCalculatedTotalAmount(totalRoomAmount + totalExtraItemsAmount);
 
-  }, [watchedCheckInDate, watchedCheckOutDate, watchedRoomPriceDetails, watchedExtraItems]);
+  }, [watchedCheckInDate, watchedCheckOutDate, watchedRoomPriceDetails, watchedExtraItems, isFullHomeStaySelected]);
 
   useEffect(() => {
     const currentDiscount = watchedDiscount || 0;
@@ -194,45 +213,89 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
   useEffect(() => {
     if (bookingsLoading || !allBookings || !watchedCheckInDate || !watchedCheckOutDate) return;
 
-    const currentlySelectedRooms = form.getValues('roomNumbers') || [];
-    const stillAvailableSelectedRooms = currentlySelectedRooms.filter(roomNum => !conflictingRooms.has(roomNum));
-
-    if (stillAvailableSelectedRooms.length < currentlySelectedRooms.length) {
-      form.setValue('roomNumbers', stillAvailableSelectedRooms, { shouldValidate: true });
-      toast({
-          title: "Room Availability Update",
-          description: "Some selected rooms became unavailable for the chosen dates and were automatically deselected.",
-          variant: "default",
-      });
+    if (isFullHomeStaySelected) {
+        const anyRoomConflicting = ROOM_CONFIG.some(room => conflictingRooms.has(room.id));
+        if (anyRoomConflicting) {
+            setIsFullHomeStaySelected(false); // Cannot select full home stay if any room is unavailable
+            form.setValue('roomNumbers', [], { shouldValidate: true }); // Clear selection
+             toast({
+                title: "Full Home Stay Unavailable",
+                description: "One or more rooms are booked for the selected dates. Full Home Stay option cannot be selected.",
+                variant: "destructive",
+            });
+            return;
+        }
+    } else {
+      const currentlySelectedRooms = form.getValues('roomNumbers') || [];
+      const stillAvailableSelectedRooms = currentlySelectedRooms.filter(roomNum => !conflictingRooms.has(roomNum));
+      if (stillAvailableSelectedRooms.length < currentlySelectedRooms.length) {
+        form.setValue('roomNumbers', stillAvailableSelectedRooms, { shouldValidate: true });
+        toast({
+            title: "Room Availability Update",
+            description: "Some selected rooms became unavailable for the chosen dates and were automatically deselected.",
+            variant: "default",
+        });
+      }
     }
-  }, [conflictingRooms, allBookings, bookingsLoading, watchedCheckInDate, watchedCheckOutDate, form, toast]);
+  }, [conflictingRooms, allBookings, bookingsLoading, watchedCheckInDate, watchedCheckOutDate, form, toast, isFullHomeStaySelected]);
 
 
   useEffect(() => {
-    const currentRoomPriceNumbers = new Set(roomPriceFields.map(f => f.roomNumber));
-    const newSelectedRoomNumbersSet = new Set(selectedRoomNumbersInForm);
+    if (isFullHomeStaySelected) {
+      const allRoomIds = ROOM_CONFIG.map(r => r.id);
+      form.setValue('roomNumbers', allRoomIds, { shouldValidate: true });
+      const pricePerRoomPackage = ROOM_CONFIG.length > 0 ? FULL_HOME_STAY_PRICE_PER_NIGHT / ROOM_CONFIG.length : 0;
+      const newRoomPriceDetails = allRoomIds.map(id => ({ roomNumber: id, price: pricePerRoomPackage }));
+      replaceRoomPrices(newRoomPriceDetails); // use replace to update the whole array
+    } else {
+      // Logic to handle individual room selections and their prices
+      const currentRoomPriceNumbers = new Set(roomPriceFields.map(f => f.roomNumber));
+      const newSelectedRoomNumbersSet = new Set(selectedRoomNumbersInForm);
 
-    newSelectedRoomNumbersSet.forEach(rn => {
-      if (!currentRoomPriceNumbers.has(rn)) {
-        appendRoomPrice({ roomNumber: rn, price: getDefaultPriceForRoom(rn) });
-      }
-    });
+      // Add new price fields for newly selected rooms
+      newSelectedRoomNumbersSet.forEach(rn => {
+        if (!currentRoomPriceNumbers.has(rn)) {
+          appendRoomPrice({ roomNumber: rn, price: getDefaultPriceForRoom(rn) });
+        }
+      });
 
-    const indicesToRemove: number[] = [];
-    roomPriceFields.forEach((field, index) => {
-      if (!newSelectedRoomNumbersSet.has(field.roomNumber)) {
-        indicesToRemove.push(index);
+      // Remove price fields for deselected rooms
+      const indicesToRemove: number[] = [];
+      roomPriceFields.forEach((field, index) => {
+        if (!newSelectedRoomNumbersSet.has(field.roomNumber)) {
+          indicesToRemove.push(index);
+        }
+      });
+      for (let i = indicesToRemove.length - 1; i >= 0; i--) {
+        removeRoomPrice(indicesToRemove[i]);
       }
-    });
-    for (let i = indicesToRemove.length - 1; i >= 0; i--) {
-      removeRoomPrice(indicesToRemove[i]);
     }
-  }, [selectedRoomNumbersInForm, roomPriceFields, appendRoomPrice, removeRoomPrice]);
+  }, [selectedRoomNumbersInForm, isFullHomeStaySelected, appendRoomPrice, removeRoomPrice, replaceRoomPrices, form]);
 
+  const handleFullHomeStayToggle = (checked: boolean) => {
+    setIsFullHomeStaySelected(checked);
+    if (checked) {
+        const allRoomIds = ROOM_CONFIG.map(r => r.id);
+        form.setValue('roomNumbers', allRoomIds, { shouldValidate: true });
+        const pricePerRoomPackage = ROOM_CONFIG.length > 0 ? FULL_HOME_STAY_PRICE_PER_NIGHT / ROOM_CONFIG.length : 0;
+        const newRoomPriceDetails = allRoomIds.map(id => ({ roomNumber: id, price: pricePerRoomPackage }));
+        replaceRoomPrices(newRoomPriceDetails);
+    } else {
+        form.setValue('roomNumbers', [], { shouldValidate: true }); // Clear rooms
+        replaceRoomPrices([]); // Clear prices
+    }
+  };
 
   async function handleSubmit(data: BookingFormValues) {
     try {
-      await onSubmit(data);
+      // Ensure roomPriceDetails are correctly set if it was Full Home Stay
+      let dataToSubmit = {...data};
+      if (isFullHomeStaySelected && ROOM_CONFIG.length > 0) {
+        const pricePerRoomPackage = FULL_HOME_STAY_PRICE_PER_NIGHT / ROOM_CONFIG.length;
+        dataToSubmit.roomPriceDetails = ROOM_CONFIG.map(r => ({ roomNumber: r.id, price: pricePerRoomPackage }));
+      }
+
+      await onSubmit(dataToSubmit);
       toast({
         title: isEditMode ? 'Booking Updated' : 'Booking Created',
         description: `Booking for ${data.guestName} has been successfully ${isEditMode ? 'updated' : 'created'}.`,
@@ -246,6 +309,9 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
       });
     }
   }
+  
+  const isAnyRoomConflictingForFullStay = ROOM_CONFIG.some(room => conflictingRooms.has(room.id));
+
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
@@ -283,6 +349,34 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
               )}
             />
             
+            <div className="space-y-3">
+                 <div className="flex items-center space-x-3 p-3 border rounded-md bg-primary/10 hover:bg-primary/20">
+                    <Checkbox
+                        id="fullHomeStay"
+                        checked={isFullHomeStaySelected}
+                        onCheckedChange={handleFullHomeStayToggle}
+                        disabled={isAnyRoomConflictingForFullStay || bookingsLoading}
+                        aria-disabled={isAnyRoomConflictingForFullStay || bookingsLoading}
+                    />
+                    <label
+                        htmlFor="fullHomeStay"
+                        className={cn(
+                            "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2",
+                            (isAnyRoomConflictingForFullStay || bookingsLoading) && "cursor-not-allowed opacity-70"
+                        )}
+                    >
+                        <Home className="h-5 w-5 text-primary"/> Book Full Home Stay (All Rooms @ Rs. {FULL_HOME_STAY_PRICE_PER_NIGHT}/night)
+                    </label>
+                    {isAnyRoomConflictingForFullStay && (
+                        <Tooltip delayDuration={100}>
+                            <TooltipTrigger asChild><InfoIcon className="h-4 w-4 text-destructive"/></TooltipTrigger>
+                            <TooltipContent><p>One or more rooms unavailable for selected dates.</p></TooltipContent>
+                        </Tooltip>
+                    )}
+                </div>
+                 <Separator/>
+            </div>
+
             <FormField
               control={form.control}
               name="roomNumbers"
@@ -291,7 +385,9 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                   <div className="mb-2">
                     <FormLabel className="text-base">Select Rooms</FormLabel>
                     <FormDescription>
-                      Choose one or more rooms. Unavailable rooms for selected dates are disabled.
+                      {isFullHomeStaySelected 
+                        ? "All rooms are selected as part of Full Home Stay." 
+                        : "Choose one or more rooms. Unavailable rooms for selected dates are disabled."}
                     </FormDescription>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -309,14 +405,14 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                                 <FormItem
                                   className={cn(
                                     "flex flex-row items-start space-x-3 space-y-0 p-3 border rounded-md hover:bg-muted/50",
-                                    isRoomConflicting && "bg-destructive/10 border-destructive/30 cursor-not-allowed opacity-70"
+                                    (isRoomConflicting || isFullHomeStaySelected) && "bg-muted/30 border-border/30 cursor-not-allowed opacity-70"
                                   )}
                                 >
                                   <FormControl>
                                     <Checkbox
                                       checked={field.value?.includes(room.id)}
                                       onCheckedChange={(checked) => {
-                                        if (isRoomConflicting && checked) return; 
+                                        if ((isRoomConflicting || isFullHomeStaySelected) && checked) return; 
                                         return checked
                                           ? field.onChange([...(field.value || []), room.id])
                                           : field.onChange(
@@ -325,16 +421,16 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                                               )
                                             )
                                       }}
-                                      disabled={isRoomConflicting}
-                                      aria-disabled={isRoomConflicting}
+                                      disabled={isRoomConflicting || isFullHomeStaySelected}
+                                      aria-disabled={isRoomConflicting || isFullHomeStaySelected}
                                     />
                                   </FormControl>
-                                  <FormLabel className={cn("font-normal", isRoomConflicting && "cursor-not-allowed")}>
+                                  <FormLabel className={cn("font-normal", (isRoomConflicting || isFullHomeStaySelected) && "cursor-not-allowed")}>
                                     {room.name} (Rs. {room.defaultPrice})
                                   </FormLabel>
                                 </FormItem>
                               </TooltipTrigger>
-                              {isRoomConflicting && (
+                              {isRoomConflicting && !isFullHomeStaySelected && (
                                 <TooltipContent side="bottom">
                                   <p className="flex items-center gap-1"><InfoIcon className="h-4 w-4" /> {room.name} is booked for these dates.</p>
                                 </TooltipContent>
@@ -353,7 +449,9 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
 
             {selectedRoomNumbersInForm && selectedRoomNumbersInForm.length > 0 && (
               <div className="space-y-4">
-                <FormLabel className="text-base">Room Prices (Per Night)</FormLabel>
+                <FormLabel className="text-base">
+                    {isFullHomeStaySelected ? "Room Prices (Package Distribution)" : "Room Prices (Per Night)"}
+                </FormLabel>
                 {roomPriceFields.map((field, index) => {
                   const roomDetails = ROOM_CONFIG.find(r => r.id === field.roomNumber);
                   return (
@@ -372,6 +470,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                               placeholder={`Price for ${roomDetails?.name || `Room ${field.roomNumber}`}`}
                               {...priceField}
                               className="pl-10" 
+                              readOnly={isFullHomeStaySelected}
                             />
                           </div>
                         </FormControl>
@@ -642,3 +741,4 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
     </Card>
   );
 }
+
