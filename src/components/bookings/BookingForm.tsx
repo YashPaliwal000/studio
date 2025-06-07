@@ -27,7 +27,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import type { Booking, BookingStatus, BookingSource, RoomPrice, ExtraItem } from '@/lib/types';
-import { ROOM_CONFIG, BOOKING_STATUSES, BOOKING_SOURCES, FULL_HOME_STAY_PRICE_PER_NIGHT } from '@/lib/constants';
+import { ROOM_CONFIG, BOOKING_STATUSES, BOOKING_SOURCES } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -67,16 +67,24 @@ const bookingFormSchema = z.object({
   status: z.enum(BOOKING_STATUSES),
   bookingSource: z.enum(BOOKING_SOURCES).optional(),
   notes: z.string().optional(),
+  fullHomeStayCustomPrice: z.coerce.number().min(0, {message: "Full home stay price must be positive."}).optional(),
 }).refine(data => data.checkOutDate > data.checkInDate, {
   message: "Check-out date must be after check-in date.",
   path: ["checkOutDate"],
 }).refine(data => {
   const selectedRoomNumbers = new Set(data.roomNumbers);
   const pricedRoomNumbers = new Set(data.roomPriceDetails.map(rp => rp.roomNumber));
+  // If full home stay is selected, roomPriceDetails might be empty initially until calculated
+  // but roomNumbers will be full. This logic needs to be robust.
+  const isFullHomeStaySelectedCurrently = data.roomNumbers?.length === ROOM_CONFIG.length;
+  if (isFullHomeStaySelectedCurrently && data.fullHomeStayCustomPrice === undefined) {
+    // This state might occur briefly. The form should enforce the price input.
+    // For now, we assume if it's full home stay, the custom price will be handled.
+  }
   return data.roomNumbers.length === data.roomPriceDetails.length &&
          Array.from(selectedRoomNumbers).every(rn => pricedRoomNumbers.has(rn));
 }, {
-  message: "Price must be set for all selected rooms.",
+  message: "Price must be set for all selected rooms, or custom full home stay price is missing.",
   path: ["roomPriceDetails"],
 });
 
@@ -84,10 +92,12 @@ export type BookingFormValues = z.infer<typeof bookingFormSchema>;
 
 interface BookingFormProps {
   initialData?: Partial<BookingFormValues & { checkInDate: Date, checkOutDate: Date, roomPrices?: RoomPrice[], id?: string, extraItems?: ExtraItem[] }>;
-  onSubmit: (data: BookingFormValues) => Promise<any>;
+  onSubmit: (data: Omit<BookingFormValues, 'fullHomeStayCustomPrice'>) => Promise<any>; // onSubmit doesn't need fullHomeStayCustomPrice
   isEditMode?: boolean;
   currentBookingId?: string;
 }
+
+const defaultFullHomeStayPackagePrice = ROOM_CONFIG.reduce((sum, room) => sum + room.defaultPrice, 0);
 
 export default function BookingForm({ initialData, onSubmit, isEditMode = false, currentBookingId }: BookingFormProps) {
   const { toast } = useToast();
@@ -101,7 +111,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
     const room = ROOM_CONFIG.find(r => r.id === roomId);
     return room ? room.defaultPrice : 1500;
   };
-
+  
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema),
     defaultValues: initialData ? {
@@ -114,6 +124,9 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
         extraItems: initialData.extraItems?.map(ei => ({ ...ei, id: ei.id || nanoid() })) || [],
         advancePayment: initialData.advancePayment || 0,
         discount: initialData.discount || 0,
+        fullHomeStayCustomPrice: initialData?.roomNumbers?.length === ROOM_CONFIG.length && initialData.roomPrices && initialData.roomPrices.length === ROOM_CONFIG.length
+            ? initialData.roomPrices.reduce((sum, rp) => sum + rp.price, 0) // Sum of one night's price from initial data
+            : defaultFullHomeStayPackagePrice,
       } : {
       guestName: '',
       guestContact: '',
@@ -125,18 +138,31 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
       discount: 0,
       status: 'Confirmed',
       notes: '',
+      fullHomeStayCustomPrice: defaultFullHomeStayPackagePrice,
     },
   });
    
   useEffect(() => {
-    if (initialData?.roomNumbers && initialData.roomNumbers.length === ROOM_CONFIG.length) {
-      const expectedPackagePricePerRoom = ROOM_CONFIG.length > 0 ? FULL_HOME_STAY_PRICE_PER_NIGHT / ROOM_CONFIG.length : 0;
-      const isLikelyFullHomeStay = initialData.roomPrices?.every(rp => Math.abs(rp.price - expectedPackagePricePerRoom) < 0.01);
-      if (isLikelyFullHomeStay) {
-        setIsFullHomeStaySelected(true);
-      }
+    if (initialData?.roomNumbers && initialData.roomNumbers.length === ROOM_CONFIG.length && initialData.roomPrices) {
+        const isPackagePrice = initialData.roomPrices.length === ROOM_CONFIG.length;
+        // A simple check: if all rooms are booked and prices exist for all.
+        // A more robust check might compare if prices are somewhat uniformly distributed from a package sum.
+        if (isPackagePrice) {
+            // Check if the sum of initial room prices (for one night) looks like a package.
+            // This is heuristic.
+            const oneNightTotalFromInitial = initialData.roomPrices.reduce((sum, rp) => sum + rp.price, 0);
+            const avgPrice = ROOM_CONFIG.length > 0 ? oneNightTotalFromInitial / ROOM_CONFIG.length : 0;
+            const arePricesUniform = initialData.roomPrices.every(rp => Math.abs(rp.price - avgPrice) < 0.01 * avgPrice); // tolerance
+
+            if (arePricesUniform) {
+              setIsFullHomeStaySelected(true);
+              form.setValue('fullHomeStayCustomPrice', oneNightTotalFromInitial, { shouldValidate: true });
+            }
+        }
+    } else if (!isEditMode) { // For new bookings, ensure default is set
+        form.setValue('fullHomeStayCustomPrice', defaultFullHomeStayPackagePrice);
     }
-  }, [initialData]);
+  }, [initialData, form, isEditMode]);
 
 
   const { fields: roomPriceFields, append: appendRoomPrice, remove: removeRoomPrice, replace: replaceRoomPrices } = useFieldArray({
@@ -156,7 +182,9 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
   const watchedExtraItems = form.watch('extraItems');
   const watchedAdvancePayment = form.watch('advancePayment');
   const watchedDiscount = form.watch('discount');
-  const watchedRoomNumbers = form.watch('roomNumbers'); // For direct use in effects if stable reference is needed
+  const watchedRoomNumbers = form.watch('roomNumbers'); 
+  const watchedFullHomeStayCustomPrice = form.watch('fullHomeStayCustomPrice');
+
 
   // For use in dependency arrays to ensure effect runs only on actual content change
   const roomNumbersDep = JSON.stringify(watchedRoomNumbers || []);
@@ -167,12 +195,12 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
       setCalculatedTotalAmount(0);
       return;
     }
-    let nights = differenceInDays(watchedCheckOutDate, watchedCheckInDate);
+    let nights = differenceInDays(new Date(watchedCheckOutDate), new Date(watchedCheckInDate));
     if (nights <= 0) nights = 1;
 
     let totalRoomAmount = 0;
-    if (isFullHomeStaySelected) {
-        totalRoomAmount = FULL_HOME_STAY_PRICE_PER_NIGHT * nights;
+    if (isFullHomeStaySelected && watchedFullHomeStayCustomPrice !== undefined && watchedFullHomeStayCustomPrice >=0) {
+        totalRoomAmount = watchedFullHomeStayCustomPrice * nights;
     } else {
         totalRoomAmount = watchedRoomPriceDetails.reduce((sum, room) => {
             return sum + (room.price * nights);
@@ -185,7 +213,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
     
     setCalculatedTotalAmount(totalRoomAmount + totalExtraItemsAmount);
 
-  }, [watchedCheckInDate, watchedCheckOutDate, watchedRoomPriceDetails, watchedExtraItems, isFullHomeStaySelected]);
+  }, [watchedCheckInDate, watchedCheckOutDate, watchedRoomPriceDetails, watchedExtraItems, isFullHomeStaySelected, watchedFullHomeStayCustomPrice]);
 
   useEffect(() => {
     const currentDiscount = watchedDiscount || 0;
@@ -205,7 +233,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
       const existingCheckIn = new Date(booking.checkInDate);
       const existingCheckOut = new Date(booking.checkOutDate);
 
-      if (watchedCheckInDate < existingCheckOut && watchedCheckOutDate > existingCheckIn) {
+      if (new Date(watchedCheckInDate) < existingCheckOut && new Date(watchedCheckOutDate) > existingCheckIn) {
         booking.roomNumbers.forEach(rn => conflicts.add(rn));
       }
     }
@@ -245,14 +273,16 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
 
   useEffect(() => {
     const currentPriceDetailsInForm = form.getValues('roomPriceDetails') || [];
-    // Get current actual room numbers from form for logic, not from watch for dep array directly
     const localSelectedRoomNumbers = form.getValues('roomNumbers') || []; 
 
     let newTargetPriceDetails: Array<{ roomNumber: number; price: number }> = [];
 
     if (isFullHomeStaySelected) {
         const allRoomIds = ROOM_CONFIG.map(r => r.id);
-        const pricePerRoomPackage = ROOM_CONFIG.length > 0 ? FULL_HOME_STAY_PRICE_PER_NIGHT / ROOM_CONFIG.length : 0;
+        const currentFullHomePrice = form.getValues('fullHomeStayCustomPrice') || 0;
+        const pricePerRoomPackage = ROOM_CONFIG.length > 0 && currentFullHomePrice >= 0
+            ? currentFullHomePrice / ROOM_CONFIG.length
+            : 0;
         newTargetPriceDetails = allRoomIds.map(id => ({ roomNumber: id, price: pricePerRoomPackage }));
     } else {
         newTargetPriceDetails = localSelectedRoomNumbers.map(rn => {
@@ -261,15 +291,13 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
         });
     }
 
-    const currentComparable = [...currentPriceDetailsInForm].sort((a,b) => a.roomNumber - b.roomNumber).map(p => `${p.roomNumber}:${p.price}`).join(',');
-    const newComparable = [...newTargetPriceDetails].sort((a,b) => a.roomNumber - b.roomNumber).map(p => `${p.roomNumber}:${p.price}`).join(',');
+    const currentComparable = [...currentPriceDetailsInForm].sort((a,b) => a.roomNumber - b.roomNumber).map(p => `${p.roomNumber}:${p.price.toFixed(2)}`).join(',');
+    const newComparable = [...newTargetPriceDetails].sort((a,b) => a.roomNumber - b.roomNumber).map(p => `${p.roomNumber}:${p.price.toFixed(2)}`).join(',');
 
     if (currentComparable !== newComparable) {
         replaceRoomPrices(newTargetPriceDetails);
     }
-  // Use roomNumbersDep (JSON.stringify of watchedRoomNumbers) for stable dependency
-  // replaceRoomPrices is stable. isFullHomeStaySelected is a primitive state.
-  }, [roomNumbersDep, isFullHomeStaySelected, replaceRoomPrices, form]);
+  }, [roomNumbersDep, isFullHomeStaySelected, watchedFullHomeStayCustomPrice, replaceRoomPrices, form]);
 
 
   const handleFullHomeStayToggle = (checked: boolean) => {
@@ -277,20 +305,35 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
     if (checked) {
         const allRoomIds = ROOM_CONFIG.map(r => r.id);
         form.setValue('roomNumbers', allRoomIds, { shouldValidate: true });
+        // Default or re-calculate custom price if needed, effect will handle roomPriceDetails
+        if(form.getValues('fullHomeStayCustomPrice') === undefined || form.getValues('fullHomeStayCustomPrice') === null){
+            form.setValue('fullHomeStayCustomPrice', defaultFullHomeStayPackagePrice, { shouldValidate: true });
+        }
     } else {
         form.setValue('roomNumbers', [], { shouldValidate: true }); 
     }
   };
 
-  async function handleSubmit(data: BookingFormValues) {
+  async function handleSubmitInternal(data: BookingFormValues) {
     try {
-      let dataToSubmit = {...data};
-      if (isFullHomeStaySelected && ROOM_CONFIG.length > 0) {
-        const pricePerRoomPackage = FULL_HOME_STAY_PRICE_PER_NIGHT / ROOM_CONFIG.length;
-        dataToSubmit.roomPriceDetails = ROOM_CONFIG.map(r => ({ roomNumber: r.id, price: pricePerRoomPackage }));
-      }
+      const { fullHomeStayCustomPrice, ...bookingDataToSubmit } = data;
 
-      await onSubmit(dataToSubmit);
+      let finalRoomPriceDetails = bookingDataToSubmit.roomPriceDetails;
+
+      if (isFullHomeStaySelected) {
+          const priceForPackage = form.getValues('fullHomeStayCustomPrice') || 0; // Use latest from form state
+          const pricePerRoomPackage = ROOM_CONFIG.length > 0 && priceForPackage >= 0
+              ? priceForPackage / ROOM_CONFIG.length
+              : 0;
+          finalRoomPriceDetails = ROOM_CONFIG.map(r => ({ roomNumber: r.id, price: pricePerRoomPackage }));
+      }
+      
+      const submissionPayload = {
+        ...bookingDataToSubmit,
+        roomPriceDetails: finalRoomPriceDetails,
+      };
+
+      await onSubmit(submissionPayload);
       toast({
         title: isEditMode ? 'Booking Updated' : 'Booking Created',
         description: `Booking for ${data.guestName} has been successfully ${isEditMode ? 'updated' : 'created'}.`,
@@ -315,7 +358,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
       </CardHeader>
       <TooltipProvider>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)}>
+        <form onSubmit={form.handleSubmit(handleSubmitInternal)}>
           <CardContent className="space-y-6">
             <FormField
               control={form.control}
@@ -360,7 +403,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                             (isAnyRoomConflictingForFullStay || bookingsLoading) && "cursor-not-allowed opacity-70"
                         )}
                     >
-                        <Home className="h-5 w-5 text-primary"/> Book Full Home Stay (All Rooms @ Rs. {FULL_HOME_STAY_PRICE_PER_NIGHT}/night)
+                        <Home className="h-5 w-5 text-primary"/> Book Full Home Stay (All Rooms)
                     </label>
                     {isAnyRoomConflictingForFullStay && (
                         <Tooltip delayDuration={100}>
@@ -369,6 +412,34 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                         </Tooltip>
                     )}
                 </div>
+
+                {isFullHomeStaySelected && (
+                  <FormField
+                    control={form.control}
+                    name="fullHomeStayCustomPrice"
+                    render={({ field }) => (
+                      <FormItem className="pl-3 pr-3 pb-2">
+                        <FormLabel>Full Home Stay Price (Per Night)</FormLabel>
+                        <FormControl>
+                          <div className="relative w-full">
+                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">Rs.</span>
+                            <Input 
+                              type="number" 
+                              placeholder="Enter total price for all rooms per night" 
+                              {...field} 
+                              className="pl-10" 
+                              onChange={(e) => {
+                                const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                field.onChange(value);
+                              }}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                  <Separator/>
             </div>
 
@@ -421,7 +492,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                                     />
                                   </FormControl>
                                   <FormLabel className={cn("font-normal", (isRoomConflicting || isFullHomeStaySelected) && "cursor-not-allowed")}>
-                                    {room.name} (Rs. {room.defaultPrice})
+                                    {room.name} (Default: Rs. {room.defaultPrice})
                                   </FormLabel>
                                 </FormItem>
                               </TooltipTrigger>
@@ -466,6 +537,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                               {...priceField}
                               className="pl-10" 
                               readOnly={isFullHomeStaySelected}
+                              onChange={(e) => priceField.onChange(Number(e.target.value))}
                             />
                           </div>
                         </FormControl>
@@ -487,7 +559,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                 <FormItem>
                   <FormLabel>Total Number of Guests</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="e.g., 2" {...field} />
+                    <Input type="number" placeholder="e.g., 2" {...field} onChange={(e) => field.onChange(Number(e.target.value))} />
                   </FormControl>
                   <FormDescription>Total guests across all selected rooms.</FormDescription>
                   <FormMessage />
@@ -561,7 +633,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                                 render={({ field }) => (
                                     <FormItem>
                                     <FormLabel>Quantity</FormLabel>
-                                    <FormControl><Input type="number" placeholder="e.g., 2" {...field} /></FormControl>
+                                    <FormControl><Input type="number" placeholder="e.g., 2" {...field} onChange={(e) => field.onChange(Number(e.target.value))}/></FormControl>
                                     <FormMessage />
                                     </FormItem>
                                 )}
@@ -586,7 +658,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                                      <FormControl>
                                         <div className="relative w-full">
                                             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">Rs.</span>
-                                            <Input type="number" placeholder="e.g., 50" {...field} className="pl-10" />
+                                            <Input type="number" placeholder="e.g., 50" {...field} className="pl-10" onChange={(e) => field.onChange(Number(e.target.value))}/>
                                         </div>
                                     </FormControl>
                                     <FormMessage />
@@ -623,7 +695,9 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                             <FormControl>
                                 <div className="relative w-full">
                                 <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">Rs.</span>
-                                <Input type="number" placeholder="Enter discount amount" {...field} className="pl-10" />
+                                <Input type="number" placeholder="Enter discount amount" {...field} className="pl-10" 
+                                 onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                                />
                                 </div>
                             </FormControl>
                             <FormMessage />
@@ -639,7 +713,9 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
                             <FormControl>
                                 <div className="relative w-full">
                                 <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">Rs.</span>
-                                <Input type="number" placeholder="Enter advance payment" {...field} className="pl-10" />
+                                <Input type="number" placeholder="Enter advance payment" {...field} className="pl-10"
+                                 onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                                 />
                                 </div>
                             </FormControl>
                             <FormMessage />
