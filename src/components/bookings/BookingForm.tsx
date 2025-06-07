@@ -130,9 +130,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
    
   useEffect(() => {
     if (initialData?.roomNumbers && initialData.roomNumbers.length === ROOM_CONFIG.length) {
-      const totalInitialPrice = initialData.roomPrices?.reduce((sum, rp) => sum + rp.price, 0) || 0;
       const expectedPackagePricePerRoom = ROOM_CONFIG.length > 0 ? FULL_HOME_STAY_PRICE_PER_NIGHT / ROOM_CONFIG.length : 0;
-      // Check if all rooms have the same distributed package price
       const isLikelyFullHomeStay = initialData.roomPrices?.every(rp => Math.abs(rp.price - expectedPackagePricePerRoom) < 0.01);
       if (isLikelyFullHomeStay) {
         setIsFullHomeStaySelected(true);
@@ -151,13 +149,18 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
     name: "extraItems",
   });
 
-  const selectedRoomNumbersInForm = form.watch('roomNumbers');
+  // Watched values
   const watchedCheckInDate = form.watch('checkInDate');
   const watchedCheckOutDate = form.watch('checkOutDate');
   const watchedRoomPriceDetails = form.watch('roomPriceDetails');
   const watchedExtraItems = form.watch('extraItems');
   const watchedAdvancePayment = form.watch('advancePayment');
   const watchedDiscount = form.watch('discount');
+  const watchedRoomNumbers = form.watch('roomNumbers'); // For direct use in effects if stable reference is needed
+
+  // For use in dependency arrays to ensure effect runs only on actual content change
+  const roomNumbersDep = JSON.stringify(watchedRoomNumbers || []);
+
 
   useEffect(() => {
     if (!watchedCheckInDate || !watchedCheckOutDate) {
@@ -216,8 +219,8 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
     if (isFullHomeStaySelected) {
         const anyRoomConflicting = ROOM_CONFIG.some(room => conflictingRooms.has(room.id));
         if (anyRoomConflicting) {
-            setIsFullHomeStaySelected(false); // Cannot select full home stay if any room is unavailable
-            form.setValue('roomNumbers', [], { shouldValidate: true }); // Clear selection
+            setIsFullHomeStaySelected(false); 
+            form.setValue('roomNumbers', [], { shouldValidate: true }); 
              toast({
                 title: "Full Home Stay Unavailable",
                 description: "One or more rooms are booked for the selected dates. Full Home Stay option cannot be selected.",
@@ -241,54 +244,46 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
 
 
   useEffect(() => {
+    const currentPriceDetailsInForm = form.getValues('roomPriceDetails') || [];
+    // Get current actual room numbers from form for logic, not from watch for dep array directly
+    const localSelectedRoomNumbers = form.getValues('roomNumbers') || []; 
+
+    let newTargetPriceDetails: Array<{ roomNumber: number; price: number }> = [];
+
     if (isFullHomeStaySelected) {
-      const allRoomIds = ROOM_CONFIG.map(r => r.id);
-      form.setValue('roomNumbers', allRoomIds, { shouldValidate: true });
-      const pricePerRoomPackage = ROOM_CONFIG.length > 0 ? FULL_HOME_STAY_PRICE_PER_NIGHT / ROOM_CONFIG.length : 0;
-      const newRoomPriceDetails = allRoomIds.map(id => ({ roomNumber: id, price: pricePerRoomPackage }));
-      replaceRoomPrices(newRoomPriceDetails); // use replace to update the whole array
+        const allRoomIds = ROOM_CONFIG.map(r => r.id);
+        const pricePerRoomPackage = ROOM_CONFIG.length > 0 ? FULL_HOME_STAY_PRICE_PER_NIGHT / ROOM_CONFIG.length : 0;
+        newTargetPriceDetails = allRoomIds.map(id => ({ roomNumber: id, price: pricePerRoomPackage }));
     } else {
-      // Logic to handle individual room selections and their prices
-      const currentRoomPriceNumbers = new Set(roomPriceFields.map(f => f.roomNumber));
-      const newSelectedRoomNumbersSet = new Set(selectedRoomNumbersInForm);
-
-      // Add new price fields for newly selected rooms
-      newSelectedRoomNumbersSet.forEach(rn => {
-        if (!currentRoomPriceNumbers.has(rn)) {
-          appendRoomPrice({ roomNumber: rn, price: getDefaultPriceForRoom(rn) });
-        }
-      });
-
-      // Remove price fields for deselected rooms
-      const indicesToRemove: number[] = [];
-      roomPriceFields.forEach((field, index) => {
-        if (!newSelectedRoomNumbersSet.has(field.roomNumber)) {
-          indicesToRemove.push(index);
-        }
-      });
-      for (let i = indicesToRemove.length - 1; i >= 0; i--) {
-        removeRoomPrice(indicesToRemove[i]);
-      }
+        newTargetPriceDetails = localSelectedRoomNumbers.map(rn => {
+            const existing = currentPriceDetailsInForm.find(p => p.roomNumber === rn);
+            return existing || { roomNumber: rn, price: getDefaultPriceForRoom(rn) };
+        });
     }
-  }, [selectedRoomNumbersInForm, isFullHomeStaySelected, appendRoomPrice, removeRoomPrice, replaceRoomPrices, form]);
+
+    const currentComparable = [...currentPriceDetailsInForm].sort((a,b) => a.roomNumber - b.roomNumber).map(p => `${p.roomNumber}:${p.price}`).join(',');
+    const newComparable = [...newTargetPriceDetails].sort((a,b) => a.roomNumber - b.roomNumber).map(p => `${p.roomNumber}:${p.price}`).join(',');
+
+    if (currentComparable !== newComparable) {
+        replaceRoomPrices(newTargetPriceDetails);
+    }
+  // Use roomNumbersDep (JSON.stringify of watchedRoomNumbers) for stable dependency
+  // replaceRoomPrices is stable. isFullHomeStaySelected is a primitive state.
+  }, [roomNumbersDep, isFullHomeStaySelected, replaceRoomPrices, form]);
+
 
   const handleFullHomeStayToggle = (checked: boolean) => {
     setIsFullHomeStaySelected(checked);
     if (checked) {
         const allRoomIds = ROOM_CONFIG.map(r => r.id);
         form.setValue('roomNumbers', allRoomIds, { shouldValidate: true });
-        const pricePerRoomPackage = ROOM_CONFIG.length > 0 ? FULL_HOME_STAY_PRICE_PER_NIGHT / ROOM_CONFIG.length : 0;
-        const newRoomPriceDetails = allRoomIds.map(id => ({ roomNumber: id, price: pricePerRoomPackage }));
-        replaceRoomPrices(newRoomPriceDetails);
     } else {
-        form.setValue('roomNumbers', [], { shouldValidate: true }); // Clear rooms
-        replaceRoomPrices([]); // Clear prices
+        form.setValue('roomNumbers', [], { shouldValidate: true }); 
     }
   };
 
   async function handleSubmit(data: BookingFormValues) {
     try {
-      // Ensure roomPriceDetails are correctly set if it was Full Home Stay
       let dataToSubmit = {...data};
       if (isFullHomeStaySelected && ROOM_CONFIG.length > 0) {
         const pricePerRoomPackage = FULL_HOME_STAY_PRICE_PER_NIGHT / ROOM_CONFIG.length;
@@ -447,7 +442,7 @@ export default function BookingForm({ initialData, onSubmit, isEditMode = false,
               )}
             />
 
-            {selectedRoomNumbersInForm && selectedRoomNumbersInForm.length > 0 && (
+            {watchedRoomNumbers && watchedRoomNumbers.length > 0 && (
               <div className="space-y-4">
                 <FormLabel className="text-base">
                     {isFullHomeStaySelected ? "Room Prices (Package Distribution)" : "Room Prices (Per Night)"}
